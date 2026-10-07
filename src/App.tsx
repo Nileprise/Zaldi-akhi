@@ -11,10 +11,13 @@ import { INITIAL_DRIVERS } from './services/mockData';
 import { CustomerApp } from './components/CustomerApp';
 import { CaptainApp } from './components/CaptainApp';
 import { AdminApp } from './components/AdminApp';
+import { FleetTelematicsGIS } from './components/FleetTelematicsGIS';
+import { ArchitecturalDepotViewer } from './components/ArchitecturalDepotViewer';
 import { sounds } from './services/audio';
 import { 
   Smartphone, UserCheck, Shield, Sparkles, 
-  Volume2, Car, Bell, ExternalLink, KeyRound, LogOut, ArrowLeft
+  Volume2, Car, Bell, ExternalLink, KeyRound, LogOut, ArrowLeft,
+  Radio, Building2
 } from 'lucide-react';
 import { PartnerAuthModal } from './components/PartnerAuthModal';
 
@@ -32,7 +35,7 @@ export default function App() {
       customerName: "Akhil Nalla",
       customerPhone: "+91 98480-12345",
       pickup: "Warangal Railway Station",
-      drop: "Clock Tower Center, Hanamkonda",
+      drop: "Lashkar Bazaar Center, Hanamkonda",
       distanceKm: 6.2,
       fare: 120,
       discount: 0,
@@ -68,7 +71,7 @@ export default function App() {
       id: "TRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
       customerName: "Kavya Patel",
       customerPhone: "+91 98112-99882",
-      pickup: "Cyber Towers, Hitec City",
+      pickup: "Hitec City Metro Station",
       drop: "Inorbit Mall, Durgam Cheruvu",
       distanceKm: 4.8,
       fare: 75,
@@ -109,6 +112,54 @@ export default function App() {
             </div>
           </div>
 
+          {/* Primary Platform Switcher Tabs */}
+          <nav className="hidden lg:flex items-center gap-1.5 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs font-bold">
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setActiveApp('CUSTOMER_APP');
+              }}
+              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+                activeApp === 'CUSTOMER_APP' 
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-black' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Car className="w-3.5 h-3.5" />
+              <span>Ride Booking</span>
+            </button>
+
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setActiveApp('FLEET_GIS');
+              }}
+              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+                activeApp === 'FLEET_GIS' 
+                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30 font-black' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5" />
+              <span>Fleet Telematics & GIS</span>
+            </button>
+
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setActiveApp('ARCHITECTURAL_DEPOT');
+              }}
+              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+                activeApp === 'ARCHITECTURAL_DEPOT' 
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-black' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>3D Virtual Depots</span>
+            </button>
+          </nav>
+
           {/* Header Actions: Live Status, Audio Mute, and Discreet Partner Portal */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-bold">
@@ -144,8 +195,56 @@ export default function App() {
         </div>
       </header>
 
+      {/* Mobile Responsive Navigation Sub-Bar */}
+      <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-3 py-2 flex items-center justify-center gap-1.5 overflow-x-auto no-scrollbar">
+        <button
+          onClick={() => {
+            sounds.playPop();
+            setActiveApp('CUSTOMER_APP');
+          }}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 ${
+            activeApp === 'CUSTOMER_APP' 
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Car className="w-3.5 h-3.5" />
+          <span>Ride Booking</span>
+        </button>
+
+        <button
+          onClick={() => {
+            sounds.playPop();
+            setActiveApp('FLEET_GIS');
+          }}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 ${
+            activeApp === 'FLEET_GIS' 
+              ? 'bg-cyan-500 text-slate-950 font-black shadow-md shadow-cyan-500/30' 
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Radio className="w-3.5 h-3.5" />
+          <span>Fleet GIS</span>
+        </button>
+
+        <button
+          onClick={() => {
+            sounds.playPop();
+            setActiveApp('ARCHITECTURAL_DEPOT');
+          }}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 ${
+            activeApp === 'ARCHITECTURAL_DEPOT' 
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' 
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Building2 className="w-3.5 h-3.5" />
+          <span>3D Depots</span>
+        </button>
+      </div>
+
       {/* Authenticated Mode Banner (Only shown when captain/admin is logged in) */}
-      {activeApp !== 'CUSTOMER_APP' && (
+      {(activeApp === 'DRIVER_APP' || activeApp === 'ADMIN_APP') && (
         <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border-b border-blue-800/50 px-4 py-2 text-xs font-bold flex items-center justify-between shadow-inner">
           <div className="flex items-center gap-2 text-blue-300">
             <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
@@ -181,6 +280,30 @@ export default function App() {
         </div>
       )}
 
+      {/* Telematics / Depot Breadcrumb Banner */}
+      {(activeApp === 'FLEET_GIS' || activeApp === 'ARCHITECTURAL_DEPOT') && (
+        <div className="bg-slate-900/90 border-b border-slate-800 px-4 py-2 text-xs font-bold flex items-center justify-between">
+          <div className="flex items-center gap-2 text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-slate-300 font-semibold">
+              {activeApp === 'FLEET_GIS' 
+                ? 'GIS Fleet Telematics • Real-Time GPS Tracking & Speed Compliance Active' 
+                : '3D Virtual Architectural Scenes • Staging Bays & Smart Urban Corridor'}
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              sounds.playPop();
+              setActiveApp('CUSTOMER_APP');
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-black text-[11px] transition"
+          >
+            <ArrowLeft className="w-3 h-3" />
+            <span>Passenger Ride</span>
+          </button>
+        </div>
+      )}
+
       {/* Main App Container */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 flex flex-col justify-center">
         {activeApp === 'CUSTOMER_APP' && (
@@ -190,6 +313,18 @@ export default function App() {
             onNewOrder={handleNewOrder}
             onUpdateOrder={handleUpdateOrder}
           />
+        )}
+
+        {activeApp === 'FLEET_GIS' && (
+          <FleetTelematicsGIS 
+            onSelectVehicleForDispatch={() => {
+              setShowAuthModal(true);
+            }} 
+          />
+        )}
+
+        {activeApp === 'ARCHITECTURAL_DEPOT' && (
+          <ArchitecturalDepotViewer />
         )}
 
         {activeApp === 'DRIVER_APP' && (

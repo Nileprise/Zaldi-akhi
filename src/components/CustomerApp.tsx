@@ -16,6 +16,14 @@ import { generateActualRoadRoute } from '../services/routeService';
 import { InteractiveMap } from './InteractiveMap';
 import { ChatModal, CallModal, WalletModal, SafetyModal } from './Modals';
 import { sounds } from '../services/audio';
+import { Vehicle3dIcon } from './Vehicle3dIcon';
+import { Vehicle5dIcon, getVehicleTheme } from './Vehicle5dIcon';
+import { LocationPinType } from './Boy3dPin';
+import { 
+  DEFAULT_GPS_COORDS, 
+  DEFAULT_GPS_ADDRESS, 
+  reverseGeocodeRealWorldAddress 
+} from '../services/geocodingService';
 
 interface CustomerAppProps {
   activeDriver: Driver;
@@ -35,6 +43,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const [showWelcome, setShowWelcome] = useState(true);
   const [isNightMode, setIsNightMode] = useState(false);
   const [activeInput, setActiveInput] = useState<'pickup' | 'drop' | null>(null);
+  const [locationPinType, setLocationPinType] = useState<LocationPinType>('character_pin');
 
   // Booking fields
   const [pickup, setPickup] = useState('');
@@ -82,32 +91,46 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   // Carpool booked state
   const [joinedPoolId, setJoinedPoolId] = useState<string | null>(null);
 
-  // Fixed Location Pin for Pickup Collection State
+  // Fixed Location Pin for Pickup Collection State (Screen-fixed pin, map moves underneath)
   const [showFixedPin, setShowFixedPin] = useState(true);
-  const [fixedPinPos, setFixedPinPos] = useState({ x: 38, y: 52 });
-  const [fixedPinAddress, setFixedPinAddress] = useState('Cyber Towers Main Gate, Hitec City');
+  const [fixedPinPos, setFixedPinPos] = useState(DEFAULT_GPS_COORDS);
+  const [fixedPinAddress, setFixedPinAddress] = useState(DEFAULT_GPS_ADDRESS);
+  const [locationToast, setLocationToast] = useState<string | null>(null);
 
-  const reverseGeocodePos = (x: number, y: number) => {
-    if (x < 35 && y < 50) return "Cyber Towers Main Gate, Hitec City";
-    if (x < 30 && y >= 50) return "Financial District Circle, Gachibowli";
-    if (x >= 60 && y < 35) return "Clock Tower Center, Hanamkonda";
-    if (x >= 60 && y >= 35 && y < 65) return "Warangal Railway Station, Platform 1";
-    if (x >= 70 && y >= 65) return "RGIA Airport Terminal 1, Shamshabad";
-    if (x >= 35 && x < 55 && y < 45) return "Road No. 36, Jubilee Hills Checkpost";
-    if (x >= 45 && y >= 45) return "Charminar Monument Plaza, Old City";
-    return `Zone Street ${Math.round(x * 1.5)}, Landmark Pillar #${Math.round(y * 2)}`;
-  };
-
-  const handleMapClickMovePin = (x: number, y: number) => {
-    sounds.playPop();
-    setFixedPinPos({ x, y });
-    const addr = reverseGeocodePos(x, y);
+  // Address updates automatically after the map stops
+  const handleAddressResolved = (addr: string, center: { x: number; y: number }) => {
     setFixedPinAddress(addr);
-    setShowFixedPin(true);
-    // Directly collect and set pickup address where the pin is placed
+    setFixedPinPos(center);
+    // Automatically update the pickup search/address field
     setPickup(addr);
     if (drop) {
       recalcDistance(addr, drop);
+    }
+  };
+
+  // When user taps Confirm Location, save the selected real-world address for pickup
+  const handleConfirmLocation = (addr: string) => {
+    sounds.playSuccess();
+    setPickup(addr);
+    setFixedPinAddress(addr);
+    setLocationToast(`Pickup Confirmed: ${addr}`);
+    setTimeout(() => setLocationToast(null), 3200);
+    // Prompt to select drop destination if empty
+    if (!drop) {
+      dropInputRef.current?.focus();
+    }
+  };
+
+  // Return to Device's GPS Position
+  const handleUseCurrentLocation = () => {
+    sounds.playTap();
+    setFixedPinPos(DEFAULT_GPS_COORDS);
+    setFixedPinAddress(DEFAULT_GPS_ADDRESS);
+    setPickup(DEFAULT_GPS_ADDRESS);
+    setLocationToast(`Current GPS Location Locked`);
+    setTimeout(() => setLocationToast(null), 2500);
+    if (drop) {
+      recalcDistance(DEFAULT_GPS_ADDRESS, drop);
     }
   };
 
@@ -373,20 +396,16 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             showFixedPin={showFixedPin}
             fixedPinAddress={fixedPinAddress}
             fixedPinPos={fixedPinPos}
-            onMapClickMovePin={handleMapClickMovePin}
-            onSelectMapCoord={(coord) => {
-              if (!pickup) {
-                setPickup(coord);
-              } else if (!drop) {
-                setDrop(coord);
-                recalcDistance(pickup, coord);
-              }
-            }}
+            onAddressResolved={handleAddressResolved}
+            onConfirmLocation={handleConfirmLocation}
+            onUseCurrentLocation={handleUseCurrentLocation}
+            locationPinType={locationPinType}
+            onChangePinType={setLocationPinType}
           />
 
-          {/* Top Brand Header Bar over Map */}
-          <div className="absolute top-12 left-0 right-0 px-5 flex justify-between items-center z-40">
-            <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl shadow-lg border border-slate-800">
+          {/* Top Brand Header Bar over Map (Unobstructed, nothing hidden behind) */}
+          <div className="absolute top-12 left-0 right-0 px-5 flex justify-between items-center z-40 pointer-events-none">
+            <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl shadow-lg border border-slate-800 pointer-events-auto">
               <div className="w-6 h-6 rounded-lg bg-brand-blue flex items-center justify-center font-black text-white text-xs shadow-md">
                 Z
               </div>
@@ -395,7 +414,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pointer-events-auto">
               <button 
                 onClick={() => setIsWalletOpen(true)}
                 className="flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-lg border border-slate-800 text-xs font-bold text-white hover:border-blue-500 transition"
@@ -479,7 +498,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                     <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-3 relative shadow-sm">
                       
                       {/* Pickup Input */}
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-800 flex-shrink-0"></div>
                         <input 
                           ref={pickupInputRef}
@@ -496,6 +515,13 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                           placeholder="Current location (Pickup)"
                           className="w-full bg-transparent font-semibold text-xs sm:text-sm outline-none text-slate-800 dark:text-white placeholder-slate-400"
                         />
+                        <button
+                          onClick={handleUseCurrentLocation}
+                          title="Use Current Location (GPS)"
+                          className="p-1 rounded-lg text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition flex items-center gap-1 text-[10px] font-bold flex-shrink-0"
+                        >
+                          <Navigation className="w-3.5 h-3.5" />
+                        </button>
                         {pickup && (
                           <button onClick={() => setPickup('')} className="p-1 text-slate-400 hover:text-slate-600">
                             <X className="w-3.5 h-3.5" />
@@ -562,16 +588,30 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                       )}
                     </div>
 
+                    {/* Location Confirmation Banner Toast */}
+                    {locationToast && (
+                      <div className="px-3 py-1.5 bg-emerald-500/15 border border-emerald-500/30 rounded-xl flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-in fade-in">
+                        <Check className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate">{locationToast}</span>
+                      </div>
+                    )}
+
                     {/* Quick Location Chips */}
                     {!pickup && !drop && (
                       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                        <button
+                          onClick={handleUseCurrentLocation}
+                          className="flex-shrink-0 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-300 dark:border-emerald-800 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 transition flex items-center gap-1.5"
+                        >
+                          <Navigation className="w-3 h-3 text-emerald-500" />
+                          <span>Use Current Location</span>
+                        </button>
                         {MOCK_LOCATIONS.slice(0, 4).map((loc) => (
                           <button
                             key={loc.id}
                             onClick={() => {
-                              setPickup('Current GPS Location');
                               setDrop(loc.name);
-                              recalcDistance('Current GPS Location', loc.name);
+                              if (pickup) recalcDistance(pickup, loc.name);
                             }}
                             className="flex-shrink-0 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-300 transition flex items-center gap-1.5"
                           >
@@ -589,9 +629,10 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                         {distanceKm > 0 && <span>Est. Distance: {distanceKm} km</span>}
                       </div>
 
-                      <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1">
+                      <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1.5 px-0.5">
                         {VEHICLE_OPTIONS.map((v) => {
                           const isSelected = selectedVehicleId === v.id;
+                          const theme = getVehicleTheme(v.id);
                           const tierFare = distanceKm > 0 
                             ? Math.round(v.baseFare + distanceKm * v.perKm)
                             : v.baseFare;
@@ -603,33 +644,45 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                                 setSelectedVehicleId(v.id);
                                 sounds.playPop();
                               }}
-                              className={`flex-shrink-0 w-[105px] p-2.5 rounded-2xl border-2 flex flex-col items-center justify-center transition-all cursor-pointer relative ${
+                              className={`group flex-shrink-0 w-[112px] p-2.5 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-300 cursor-pointer relative overflow-hidden select-none ${
                                 isSelected 
-                                  ? 'border-brand-blue bg-blue-50/60 dark:bg-blue-950/40 shadow-md shadow-blue-500/10' 
-                                  : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 hover:border-slate-300'
+                                  ? 'border-brand-blue bg-gradient-to-b from-blue-500/10 to-blue-500/5 dark:from-blue-600/20 dark:to-slate-900/90 shadow-lg scale-[1.02]' 
+                                  : 'border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700 hover:scale-[1.01]'
                               }`}
+                              style={{
+                                boxShadow: isSelected ? theme.glowShadow : undefined
+                              }}
                             >
+                              {/* 5D Holographic Badge */}
                               {v.badge && (
-                                <span className="absolute -top-2 px-1.5 py-0.5 rounded-full bg-brand-blue text-[8px] font-black text-white uppercase tracking-wider">
+                                <span className="absolute -top-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-[8px] font-black text-white uppercase tracking-wider shadow-sm">
                                   {v.badge}
                                 </span>
                               )}
-                              <span className={`text-2xl mb-1 ${isSelected ? 'icon-3d' : ''}`}>
-                                {v.icon}
-                              </span>
-                              <span className="font-bold text-[11px] text-slate-800 dark:text-slate-100 text-center leading-tight">
+                              
+                              {/* 5D Vehicle Icon Container */}
+                              <div className="w-12 h-12 mb-1 flex items-center justify-center relative">
+                                <Vehicle5dIcon 
+                                  type={v.id} 
+                                  size={44} 
+                                  isSelected={isSelected}
+                                />
+                              </div>
+
+                              <span className="font-black text-xs text-slate-800 dark:text-slate-100 text-center leading-tight tracking-tight">
                                 {v.name}
                               </span>
-                              <span className="text-[9px] text-slate-400 font-semibold mt-0.5">
+                              <span className="text-[9px] text-slate-400 font-medium">
                                 {v.capacity}
                               </span>
 
-                              <div className="flex flex-col items-center mt-1.5 pt-1 border-t border-slate-100 dark:border-slate-700/60 w-full">
+                              <div className="flex flex-col items-center mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80 w-full">
                                 <span className="font-black text-xs text-slate-900 dark:text-white">
                                   ₹{tierFare}
                                 </span>
-                                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
-                                  {v.etaMin} min away
+                                <span className="text-[9px] font-bold text-emerald-500 dark:text-emerald-400 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  <span>{v.etaMin} min</span>
                                 </span>
                               </div>
                             </div>
@@ -711,9 +764,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                 {activeOrder && (activeOrder.status === 'FINDING_DRIVER' || activeOrder.status === 'SEARCHING') && (
                   <div className="flex flex-col items-center justify-center py-5 text-center space-y-4 animate-in fade-in">
                     <div className="relative flex items-center justify-center w-20 h-20">
-                      <div className="absolute w-full h-full rounded-full bg-blue-500/20 animate-ping-slow"></div>
-                      <div className="w-16 h-16 rounded-full bg-brand-blue/10 border-2 border-brand-blue flex items-center justify-center text-3xl shadow-lg">
-                        {activeOrder.vehicleIcon}
+                      <div className="w-16 h-16 rounded-2xl bg-brand-blue/10 border-2 border-brand-blue flex items-center justify-center shadow-lg">
+                        <Vehicle3dIcon type={activeOrder.vehicleTier} size={46} className="filter drop-shadow-md" />
                       </div>
                     </div>
                     <div>
@@ -802,8 +854,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
                     {/* Driver Card */}
                     <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                      <div className="w-12 h-12 rounded-2xl bg-brand-blue/20 border-2 border-brand-blue/40 flex items-center justify-center font-black text-lg text-brand-blue flex-shrink-0">
-                        {currentDriver.name.charAt(0)}
+                      <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <Vehicle3dIcon type={activeOrder.vehicleTier || selectedVehicle.name} size={38} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
@@ -879,8 +931,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
                     {/* Driver Card */}
                     <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                      <div className="w-12 h-12 rounded-2xl bg-brand-blue/20 border-2 border-brand-blue/40 flex items-center justify-center font-black text-lg text-brand-blue flex-shrink-0">
-                        {currentDriver.name.charAt(0)}
+                      <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <Vehicle3dIcon type={activeOrder.vehicleTier || selectedVehicle.name} size={38} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
@@ -930,8 +982,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
                     {/* Driver Card */}
                     <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                      <div className="w-12 h-12 rounded-2xl bg-brand-blue/20 border-2 border-brand-blue/40 flex items-center justify-center font-black text-lg text-brand-blue flex-shrink-0">
-                        {currentDriver.name.charAt(0)}
+                      <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <Vehicle3dIcon type={activeOrder.vehicleTier || selectedVehicle.name} size={38} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
@@ -1338,7 +1390,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                       <span className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-brand-blue">💼</span>
                       <div>
                         <div className="font-bold text-slate-800 dark:text-white">Work / Office</div>
-                        <div className="text-[10px] text-slate-400">Building 9, Cyber Towers, Hitec City</div>
+                        <div className="text-[10px] text-slate-400">Building 9, Mindspace IT Park, Hitec City</div>
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-slate-400" />

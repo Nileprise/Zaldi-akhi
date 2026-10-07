@@ -43,6 +43,10 @@ class SoundEffects {
     }
   }
 
+  playTap() {
+    this.playPop();
+  }
+
   playPing() {
     try {
       const ctx = this.getContext();

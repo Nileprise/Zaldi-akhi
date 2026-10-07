@@ -2,7 +2,7 @@ import { RoutePoint, RoadRouteInfo } from '../types';
 
 // City grid road intersections and major junction coordinates in relative 0-100 canvas space
 const ROAD_JUNCTIONS: Record<string, RoutePoint> = {
-  CYBER_TOWERS: { x: 28, y: 46, streetName: 'Cyber Towers Interchange' },
+  HITEC_METRO: { x: 28, y: 46, streetName: 'Hitec City Metro Station Road' },
   HITEC_MAIN: { x: 32, y: 48, streetName: 'Hitec City Main Road' },
   DURGAM_CHERUVU: { x: 36, y: 44, streetName: 'Cable Bridge Expressway' },
   INORBIT_MALL: { x: 40, y: 42, streetName: 'Inorbit Mall Boulevard' },
@@ -21,7 +21,7 @@ const ROAD_JUNCTIONS: Record<string, RoutePoint> = {
   WARANGAL_STATION: { x: 74, y: 58, streetName: 'Warangal Station Road' },
   KAZIPET_JUNCTION: { x: 68, y: 52, streetName: 'Kazipet Diesel Colony Road' },
   SUBEDARI_CORRIDOR: { x: 72, y: 46, streetName: 'Subedari Arterial Avenue' },
-  CLOCK_TOWER: { x: 78, y: 38, streetName: 'Clock Tower Lashkar Bazaar' },
+  LASHKAR_BAZAAR: { x: 78, y: 38, streetName: 'Lashkar Bazaar Cross Road' },
   HANAMKONDA_BUS: { x: 75, y: 42, streetName: 'Balasamudram Bus Terminal Rd' },
   KAKATIYA_UNIVERSITY: { x: 72, y: 26, streetName: 'KU University Cross Roads' }
 };
@@ -29,7 +29,7 @@ const ROAD_JUNCTIONS: Record<string, RoutePoint> = {
 // Map friendly address strings to closest road junction
 export function resolveAddressToRoadJunction(address: string): RoutePoint {
   const q = address.toLowerCase();
-  if (q.includes('cyber') || q.includes('hitec')) return ROAD_JUNCTIONS.CYBER_TOWERS;
+  if (q.includes('hitec') || q.includes('metro')) return ROAD_JUNCTIONS.HITEC_METRO;
   if (q.includes('inorbit')) return ROAD_JUNCTIONS.INORBIT_MALL;
   if (q.includes('mindspace') || q.includes('madhapur')) return ROAD_JUNCTIONS.MINDSPACE;
   if (q.includes('gachibowli') || q.includes('sln')) return ROAD_JUNCTIONS.GACHIBOWLI_ORR;
@@ -41,7 +41,7 @@ export function resolveAddressToRoadJunction(address: string): RoutePoint {
   if (q.includes('airport') || q.includes('rgia')) return ROAD_JUNCTIONS.RGIA_AIRPORT;
   if (q.includes('warangal') || q.includes('station')) return ROAD_JUNCTIONS.WARANGAL_STATION;
   if (q.includes('kazipet')) return ROAD_JUNCTIONS.KAZIPET_JUNCTION;
-  if (q.includes('clock') || q.includes('hanamkonda')) return ROAD_JUNCTIONS.CLOCK_TOWER;
+  if (q.includes('lashkar') || q.includes('hanamkonda')) return ROAD_JUNCTIONS.LASHKAR_BAZAAR;
   if (q.includes('kakatiya') || q.includes('university')) return ROAD_JUNCTIONS.KAKATIYA_UNIVERSITY;
 
   // Hash-based deterministic coordinate on road grid

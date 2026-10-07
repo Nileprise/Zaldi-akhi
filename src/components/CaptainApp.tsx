@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Driver, RideOrder } from '../types';
 import { sounds } from '../services/audio';
+import { Vehicle3dIcon } from './Vehicle3dIcon';
 
 interface CaptainAppProps {
   drivers: Driver[];
@@ -82,8 +83,8 @@ export const CaptainApp: React.FC<CaptainAppProps> = ({
         
         {/* Profile Info */}
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-600/30">
-            {activeDriver.name.charAt(0)}
+          <div className="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center shadow-lg flex-shrink-0">
+            <Vehicle3dIcon type={activeDriver.vehicle} size={42} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -163,8 +164,8 @@ export const CaptainApp: React.FC<CaptainAppProps> = ({
           
           <div className="flex items-center justify-between pb-4 border-b border-blue-500/30">
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
-              <span className="text-xs font-black uppercase tracking-wider text-blue-300">New Ride Dispatch Request</span>
+              <Vehicle3dIcon type={incomingOrder.vehicleTier} size={28} />
+              <span className="text-xs font-black uppercase tracking-wider text-blue-300">New {incomingOrder.vehicleTier} Ride Dispatch Request</span>
             </div>
             <div className="px-3 py-1 rounded-full bg-brand-blue text-white font-black text-xs">
               Expires in 28s

@@ -1,4 +1,9 @@
-export type AppRole = 'CUSTOMER_APP' | 'DRIVER_APP' | 'ADMIN_APP';
+export type AppRole = 
+  | 'CUSTOMER_APP' 
+  | 'DRIVER_APP' 
+  | 'ADMIN_APP' 
+  | 'FLEET_GIS' 
+  | 'ARCHITECTURAL_DEPOT';
 
 export type CustomerTab = 'BOOKING' | 'CARPOOL' | 'OUTSTATION' | 'HISTORY' | 'PROFILE';
 

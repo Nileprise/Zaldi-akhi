@@ -7,6 +7,10 @@ import {
 import { Driver, RideOrder } from '../types';
 import { sounds } from '../services/audio';
 import { DemandHeatmap } from './DemandHeatmap';
+import { CaptainDensityMap } from './CaptainDensityMap';
+import { FleetTelematicsGIS } from './FleetTelematicsGIS';
+import { ArchitecturalDepotViewer } from './ArchitecturalDepotViewer';
+import { Radio, Building2 } from 'lucide-react';
 
 interface AdminAppProps {
   drivers: Driver[];
@@ -23,6 +27,7 @@ export const AdminApp: React.FC<AdminAppProps> = ({
 }) => {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeSpatialView, setActiveSpatialView] = useState<'FLEET_TELEMATICS' | 'CAPTAIN_DENSITY' | 'DEMAND_HEATMAP' | 'VIRTUAL_DEPOTS'>('FLEET_TELEMATICS');
 
   // Financial and operational KPI computations
   const totalGMV = orders.reduce((acc, o) => acc + (o.status !== 'CANCELLED' ? o.finalFare : 0), 0) + 14850;
@@ -109,12 +114,103 @@ export const AdminApp: React.FC<AdminAppProps> = ({
 
       </div>
 
-      {/* Real-time D3 Heatmap Overlay for Hyderabad and Warangal */}
-      <DemandHeatmap 
-        onDispatchIncentive={(zoneName, amt) => {
-          sounds.playAlert();
-        }}
-      />
+      {/* Spatial Map Visualization Switcher & Views */}
+      <div className="space-y-4">
+        {/* Switcher Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-2.5 rounded-2xl shadow-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-300 uppercase tracking-wider px-2">
+              Operations Telematics & Maps:
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 flex-wrap">
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setActiveSpatialView('FLEET_TELEMATICS');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition ${
+                activeSpatialView === 'FLEET_TELEMATICS'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5" />
+              <span>Fleet Telematics & GIS</span>
+            </button>
+
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setActiveSpatialView('VIRTUAL_DEPOTS');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition ${
+                activeSpatialView === 'VIRTUAL_DEPOTS'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>3D Virtual Depots & Hubs</span>
+            </button>
+
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setActiveSpatialView('CAPTAIN_DENSITY');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition ${
+                activeSpatialView === 'CAPTAIN_DENSITY'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Captain Density Grid</span>
+            </button>
+
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setActiveSpatialView('DEMAND_HEATMAP');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition ${
+                activeSpatialView === 'DEMAND_HEATMAP'
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Demand Heatmap</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Dynamic Map Component */}
+        {activeSpatialView === 'FLEET_TELEMATICS' ? (
+          <FleetTelematicsGIS />
+        ) : activeSpatialView === 'VIRTUAL_DEPOTS' ? (
+          <ArchitecturalDepotViewer />
+        ) : activeSpatialView === 'CAPTAIN_DENSITY' ? (
+          <CaptainDensityMap 
+            drivers={drivers}
+            onToggleDriverStatus={(driverId) => {
+              const d = drivers.find(drv => drv.id === driverId);
+              if (d) onUpdateDriver(driverId, { isOnline: !d.isOnline });
+            }}
+            onDispatchToZone={() => {
+              sounds.playSuccess();
+            }}
+          />
+        ) : (
+          <DemandHeatmap 
+            onDispatchIncentive={() => {
+              sounds.playAlert();
+            }}
+          />
+        )}
+      </div>
 
       {/* Active Captains Fleet Overview */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">

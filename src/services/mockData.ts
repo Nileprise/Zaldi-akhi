@@ -70,12 +70,12 @@ export const VEHICLE_OPTIONS: VehicleTier[] = [
 ];
 
 export const MOCK_LOCATIONS: LocationItem[] = [
-  { id: "loc-1", name: "Cyber Towers", area: "Hitec City, Hyderabad", type: "office", lat: 17.4504, lng: 78.3811 },
+  { id: "loc-1", name: "Hitec City Metro Station", area: "Madhapur, Hyderabad", type: "office", lat: 17.4504, lng: 78.3811 },
   { id: "loc-2", name: "RGIA International Airport", area: "Shamshabad", type: "airport", lat: 17.2403, lng: 78.4294 },
   { id: "loc-3", name: "SLN Terminus", area: "Gachibowli, Hyderabad", type: "office", lat: 17.4568, lng: 78.3644 },
   { id: "loc-4", name: "Warangal Railway Station", area: "Kazipet Junction", type: "station", lat: 17.9689, lng: 79.5941 },
   { id: "loc-5", name: "Hanamkonda Bus Station", area: "Subedari, Warangal", type: "station", lat: 18.0073, lng: 79.5593 },
-  { id: "loc-6", name: "Clock Tower Center", area: "Lashkar Bazaar, Hanamkonda", type: "popular", lat: 18.0012, lng: 79.5678 },
+  { id: "loc-6", name: "Lashkar Bazaar Center", area: "Hanamkonda, Warangal", type: "popular", lat: 18.0012, lng: 79.5678 },
   { id: "loc-7", name: "Mindspace IT Park", area: "Madhapur, Hyderabad", type: "office", lat: 17.4435, lng: 78.3772 },
   { id: "loc-8", name: "Secunderabad Junction", area: "Station Road, Secunderabad", type: "station", lat: 17.4334, lng: 78.5015 },
   { id: "loc-9", name: "Inorbit Mall", area: "Cyberabad, Durgam Cheruvu", type: "popular", lat: 17.4345, lng: 78.3866 },
@@ -149,7 +149,7 @@ export const MOCK_CARPOOLS: CarpoolRoute[] = [
   {
     id: "pool-1",
     from: "Hanamkonda Collectorate",
-    to: "Cyber Towers, Hitec City",
+    to: "Mindspace IT Park, Hitec City",
     departureTime: "Today at 05:30 PM",
     driverName: "Kiran Reddy",
     vehicle: "Hyundai Creta • TS 09 CD 4422",
@@ -227,7 +227,7 @@ export const PAST_RIDES_MOCK = [
   {
     id: "TRP-8F29A1",
     pickup: "Warangal Railway Station",
-    drop: "Clock Tower Center, Hanamkonda",
+    drop: "Lashkar Bazaar Center, Hanamkonda",
     date: "Yesterday, 8:45 PM",
     fare: 115,
     vehicleTier: "Auto 3W",
@@ -248,7 +248,7 @@ export const PAST_RIDES_MOCK = [
   },
   {
     id: "TRP-3A00B7",
-    pickup: "Cyber Towers, Hitec City",
+    pickup: "Hitec City Metro Station",
     drop: "Mindspace IT Park",
     date: "01 Oct 2026, 06:10 PM",
     fare: 45,
@@ -263,7 +263,7 @@ export const HEATMAP_INITIAL_POINTS: HeatmapDemandPoint[] = [
   // Hyderabad Clusters
   {
     id: "hm-hyd-1",
-    name: "Cyber Towers & Mindspace",
+    name: "Madhapur & Mindspace",
     area: "Hitec City / Madhapur",
     city: "Hyderabad",
     x: 28,
@@ -415,7 +415,7 @@ export const HEATMAP_INITIAL_POINTS: HeatmapDemandPoint[] = [
   },
   {
     id: "hm-wgl-3",
-    name: "Clock Tower Center",
+    name: "Lashkar Bazaar Center",
     area: "Lashkar Bazaar, Hanamkonda",
     city: "Warangal",
     x: 78,
