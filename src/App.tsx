@@ -90,30 +90,30 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-brand-blue selection:text-white">
+    <div className="min-h-screen bg-white text-slate-900 flex flex-col selection:bg-brand-blue selection:text-white">
       
       {/* Top Universal App Navigation Header */}
-      <header className="sticky top-0 z-[120] bg-slate-900/90 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-8 py-3.5 shadow-2xl">
+      <header className="sticky top-0 z-[120] bg-white/95 backdrop-blur-xl border-b border-slate-200 px-4 sm:px-8 py-3.5 shadow-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           
           {/* Logo Branding - Direct Zaldi Identity */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveApp('CUSTOMER_APP')}>
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-brand-blue to-blue-400 flex items-center justify-center shadow-lg shadow-blue-600/30 font-black text-white text-base">
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-brand-blue to-blue-500 flex items-center justify-center shadow-lg shadow-blue-600/30 font-black text-white text-base">
               Z
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xl font-black tracking-tight text-white">Zaldi</span>
-                <span className="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 text-[10px] font-black uppercase tracking-wider border border-blue-500/30">
+                <span className="text-xl font-black tracking-tight text-slate-900">Zaldi</span>
+                <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 text-[10px] font-black uppercase tracking-wider border border-blue-500/30">
                   MOBILITY
                 </span>
               </div>
-              <p className="text-[10px] font-bold text-slate-400 -mt-0.5">Hyderabad & Warangal City Network</p>
+              <p className="text-[10px] font-bold text-slate-500 -mt-0.5">Hyderabad & Warangal City Network</p>
             </div>
           </div>
 
           {/* Primary Platform Switcher Tabs */}
-          <nav className="hidden lg:flex items-center gap-1.5 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs font-bold">
+          <nav className="hidden lg:flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
             <button
               onClick={() => {
                 sounds.playPop();
@@ -122,7 +122,7 @@ export default function App() {
               className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
                 activeApp === 'CUSTOMER_APP' 
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-black' 
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Car className="w-3.5 h-3.5" />
@@ -136,8 +136,8 @@ export default function App() {
               }}
               className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
                 activeApp === 'FLEET_GIS' 
-                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30 font-black' 
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30 font-black' 
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Radio className="w-3.5 h-3.5" />
@@ -152,7 +152,7 @@ export default function App() {
               className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
                 activeApp === 'ARCHITECTURAL_DEPOT' 
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-black' 
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
@@ -162,9 +162,9 @@ export default function App() {
 
           {/* Header Actions: Live Status, Audio Mute, and Discreet Partner Portal */}
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-slate-300">Live Fleet Active</span>
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-slate-700">Live Fleet Active</span>
             </div>
 
             <button
@@ -173,7 +173,7 @@ export default function App() {
                 if (!muted) sounds.playPing();
               }}
               title="Toggle Audio Feedback"
-              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 text-slate-300 transition"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 transition"
             >
               <Volume2 className="w-4 h-4" />
             </button>
@@ -185,9 +185,9 @@ export default function App() {
                 setShowAuthModal(true);
               }}
               title="Partner Portal (Captain & Operations Access)"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 text-slate-300 text-xs font-bold transition hover:text-white"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-bold transition hover:text-slate-900"
             >
-              <KeyRound className="w-3.5 h-3.5 text-blue-400" />
+              <KeyRound className="w-3.5 h-3.5 text-blue-600" />
               <span className="hidden sm:inline">Partner Portal</span>
             </button>
           </div>
@@ -196,7 +196,7 @@ export default function App() {
       </header>
 
       {/* Mobile Responsive Navigation Sub-Bar */}
-      <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-3 py-2 flex items-center justify-center gap-1.5 overflow-x-auto no-scrollbar">
+      <div className="lg:hidden bg-white border-b border-slate-200 px-3 py-2 flex items-center justify-center gap-1.5 overflow-x-auto no-scrollbar">
         <button
           onClick={() => {
             sounds.playPop();
@@ -205,7 +205,7 @@ export default function App() {
           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 ${
             activeApp === 'CUSTOMER_APP' 
               ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-              : 'text-slate-400 hover:text-white'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <Car className="w-3.5 h-3.5" />
@@ -219,8 +219,8 @@ export default function App() {
           }}
           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 ${
             activeApp === 'FLEET_GIS' 
-              ? 'bg-cyan-500 text-slate-950 font-black shadow-md shadow-cyan-500/30' 
-              : 'text-slate-400 hover:text-white'
+              ? 'bg-cyan-600 text-white font-black shadow-md shadow-cyan-600/30' 
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <Radio className="w-3.5 h-3.5" />
@@ -235,7 +235,7 @@ export default function App() {
           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 ${
             activeApp === 'ARCHITECTURAL_DEPOT' 
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' 
-              : 'text-slate-400 hover:text-white'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <Building2 className="w-3.5 h-3.5" />
@@ -282,10 +282,10 @@ export default function App() {
 
       {/* Telematics / Depot Breadcrumb Banner */}
       {(activeApp === 'FLEET_GIS' || activeApp === 'ARCHITECTURAL_DEPOT') && (
-        <div className="bg-slate-900/90 border-b border-slate-800 px-4 py-2 text-xs font-bold flex items-center justify-between">
-          <div className="flex items-center gap-2 text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="text-slate-300 font-semibold">
+        <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 text-xs font-bold flex items-center justify-between">
+          <div className="flex items-center gap-2 text-slate-700">
+            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+            <span className="text-slate-700 font-semibold">
               {activeApp === 'FLEET_GIS' 
                 ? 'GIS Fleet Telematics • Real-Time GPS Tracking & Speed Compliance Active' 
                 : '3D Virtual Architectural Scenes • Staging Bays & Smart Urban Corridor'}
@@ -305,7 +305,7 @@ export default function App() {
       )}
 
       {/* Main App Container */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 flex flex-col justify-center">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 flex flex-col justify-center bg-white">
         {activeApp === 'CUSTOMER_APP' && (
           <CustomerApp
             activeDriver={activeDriver}
@@ -359,13 +359,13 @@ export default function App() {
       />
 
       {/* Footer Info */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-4 px-6 text-center text-xs text-slate-500 flex flex-wrap items-center justify-between max-w-7xl mx-auto w-full">
+      <footer className="border-t border-slate-200 bg-white py-4 px-6 text-center text-xs text-slate-600 flex flex-wrap items-center justify-between max-w-7xl mx-auto w-full">
         <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-400">Zaldi Logistics & Mobility Platform</span>
+          <span className="font-bold text-slate-700">Zaldi Logistics & Mobility Platform</span>
           <span>•</span>
           <span>Hyderabad & Warangal City Network</span>
         </div>
-        <div className="flex items-center gap-4 text-[11px]">
+        <div className="flex items-center gap-4 text-[11px] text-slate-500">
           <span>Fast Pickup</span>
           <span>•</span>
           <span>Verified Captains</span>

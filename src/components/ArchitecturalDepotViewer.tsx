@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Building2, Warehouse, Truck, Zap, Sun, Moon, Sparkles, 
   Layers, CheckCircle, Clock, BatteryCharging, AlertCircle, 
-  ShieldCheck, ArrowUpRight, Maximize2, Compass
+  ShieldCheck, ArrowUpRight, Maximize2, Compass, Box, Download
 } from 'lucide-react';
 import { 
   ARCHITECTURAL_FACILITIES, 
@@ -10,6 +10,7 @@ import {
   DepotBay 
 } from '../services/telematicsData';
 import { Vehicle5dIcon } from './Vehicle5dIcon';
+import { LowPolyVehicleStudio } from './LowPolyVehicleStudio';
 import { sounds } from '../services/audio';
 
 export const ArchitecturalDepotViewer: React.FC = () => {
@@ -17,6 +18,7 @@ export const ArchitecturalDepotViewer: React.FC = () => {
   const [selectedBayId, setSelectedBayId] = useState<string>(ARCHITECTURAL_FACILITIES[0].bays[0].id);
   const [lightingMode, setLightingMode] = useState<'DAY_SUNLIGHT' | 'TWILIGHT' | 'NIGHT_FLOODLIGHTS'>('NIGHT_FLOODLIGHTS');
   const [viewPerspective, setViewPerspective] = useState<'ISOMETRIC_3D' | 'TOP_BLUEPRINT' | 'CROSS_SECTION'>('ISOMETRIC_3D');
+  const [showStudio, setShowStudio] = useState(false);
 
   const facility = ARCHITECTURAL_FACILITIES.find(f => f.id === selectedFacilityId) || ARCHITECTURAL_FACILITIES[0];
   const selectedBay = facility.bays.find(b => b.id === selectedBayId) || facility.bays[0];
@@ -100,6 +102,18 @@ export const ArchitecturalDepotViewer: React.FC = () => {
               Blueprint Plan
             </button>
           </div>
+
+          {/* 3D Asset Studio & GLB Downloader Button */}
+          <button
+            onClick={() => {
+              sounds.playPop();
+              setShowStudio(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-bold transition shadow-md"
+          >
+            <Box className="w-3.5 h-3.5 text-amber-400" />
+            <span>3D Low-Poly Hub & GLB</span>
+          </button>
         </div>
       </div>
 
@@ -389,17 +403,42 @@ export const ArchitecturalDepotViewer: React.FC = () => {
           )}
 
           {/* Quick Action */}
-          <button
-            onClick={() => sounds.playSuccess()}
-            className="w-full py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-black text-xs flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30 transition"
-          >
-            <Zap className="w-4 h-4 text-white" />
-            <span>Assign Staging Sequence</span>
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setShowStudio(true);
+              }}
+              className="w-full py-2.5 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 shadow-md transition"
+            >
+              <Box className="w-4 h-4 text-amber-400" />
+              <span>Inspect Low-Poly 3D Assets (GLB / PNG)</span>
+            </button>
+
+            <button
+              onClick={() => sounds.playSuccess()}
+              className="w-full py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-black text-xs flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30 transition"
+            >
+              <Zap className="w-4 h-4 text-white" />
+              <span>Assign Staging Sequence</span>
+            </button>
+          </div>
 
         </div>
 
       </div>
+
+      {/* 3D Low-Poly Vehicle Studio Modal */}
+      {showStudio && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto no-scrollbar">
+            <LowPolyVehicleStudio
+              initialVehicle="truck"
+              onClose={() => setShowStudio(false)}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

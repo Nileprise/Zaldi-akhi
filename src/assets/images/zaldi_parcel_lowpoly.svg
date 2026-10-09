@@ -1,0 +1,34 @@
+<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Front Wheel -->
+  <polygon points="350,345 390,315 400,270 380,235 340,260 330,305" fill="#0f172a" />
+  <polygon points="350,345 330,305 340,260 365,290" fill="#1e293b" />
+  <polygon points="355,315 375,300 380,280 370,265 350,285" fill="#34d399" />
+
+  <!-- Rear Wheel -->
+  <polygon points="140,375 180,345 190,300 170,265 130,290 120,335" fill="#0f172a" />
+  <polygon points="140,375 120,335 130,290 155,320" fill="#1e293b" />
+  <polygon points="145,345 165,330 170,310 160,295 140,315" fill="#34d399" />
+
+  <!-- Step-Through Floorboard & Frame (Deep Teal) -->
+  <polygon points="175,340 335,325 325,305 165,315" fill="#064e3b" />
+  <!-- Front Apron & Steering Column -->
+  <polygon points="295,315 365,245 350,215 280,285" fill="#047857" />
+  <polygon points="350,215 365,245 380,230 365,200" fill="#065f46" />
+  <!-- Handlebars -->
+  <polygon points="330,185 385,175 390,185 335,195" fill="#0f172a" />
+
+  <!-- Rider Seat (Dark Slate) -->
+  <polygon points="180,275 255,265 245,290 175,295" fill="#0f172a" />
+
+  <!-- HIGH-CONTRAST PARCEL DELIVERY CUBE (Fluorescent Mint & Emerald) -->
+  <!-- Delivery Cube Flank (Mint Green) -->
+  <polygon points="110,295 210,280 200,165 100,180" fill="#10b981" />
+  <polygon points="110,295 100,180 85,195 90,310" fill="#059669" />
+  <!-- Delivery Cube Top Plane (Bright Lime Mint) -->
+  <polygon points="100,180 200,165 165,135 75,150" fill="#34d399" />
+
+  <!-- VIVID ZALDI 'Z' EMBLEM on the Parcel Cube (Neon Golden Amber) -->
+  <polygon points="115,255 185,245 175,252 135,258" fill="#facc15" />
+  <polygon points="175,252 135,258 170,200 130,205" fill="#eab308" />
+  <polygon points="170,200 130,205 190,195 150,202" fill="#facc15" />
+</svg>

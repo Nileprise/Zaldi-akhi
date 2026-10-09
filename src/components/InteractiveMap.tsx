@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Compass, Navigation, Sun, Moon, ShieldAlert, 
-  RotateCcw, MapPin, Clock, CheckCircle2
+  RotateCcw, Clock, CheckCircle2, Layers, Crosshair, 
+  Radio, Train, Activity, Eye, SlidersHorizontal, Sparkles
 } from 'lucide-react';
 import { BookingStatus, RoutePoint } from '../types';
 import { 
@@ -11,7 +12,7 @@ import {
   calculateAutoBoundingBox,
   resolveAddressToRoadJunction 
 } from '../services/routeService';
-import { Boy3dPin, LocationPinType } from './Boy3dPin';
+import { AnimatedLocationPin, PinStyleType } from './AnimatedLocationPin';
 import { LiveMapVehicleMarker, Destination3dPin } from './Vehicle3dIcon';
 import { 
   reverseGeocodeRealWorldAddress, 
@@ -19,6 +20,14 @@ import {
   DEFAULT_GPS_ADDRESS 
 } from '../services/geocodingService';
 import { sounds } from '../services/audio';
+
+export type MapBaseLayerStyle = 'standard' | 'night' | 'satellite';
+
+export interface MapLayerOptions {
+  traffic: boolean;
+  transit: boolean;
+  fleetGIS: boolean;
+}
 
 interface InteractiveMapProps {
   pickup: string;
@@ -40,8 +49,8 @@ interface InteractiveMapProps {
   onAddressResolved?: (address: string, center: { x: number; y: number }) => void;
   onConfirmLocation?: (address: string) => void;
   onUseCurrentLocation?: () => void;
-  locationPinType?: LocationPinType;
-  onChangePinType?: (type: LocationPinType) => void;
+  locationPinType?: any;
+  onChangePinType?: (type: any) => void;
 }
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
@@ -50,7 +59,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   status,
   progressPercent = 0,
   vehicleTierName = 'Cab',
-  isNightMode = true,
+  isNightMode = false,
   onToggleNightMode,
   showNearbyDrivers = true,
   driverPlate = 'TS 09 AB 1234',
@@ -67,8 +76,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Container ref for client bounding rect
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  // Center coordinate of the map in 0-100 canvas units
-  // Map moves underneath the fixed center pin!
+  // Center coordinate of the map in 0-100 canvas units (Map moves underneath fixed pin!)
   const [mapCenter, setMapCenter] = useState<{ x: number; y: number }>(
     fixedPinPos || DEFAULT_GPS_COORDS
   );
@@ -84,15 +92,45 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const dragStartRef = useRef<{ clientX: number; clientY: number; startCenter: { x: number; y: number } } | null>(null);
   const stopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Locating animation state (triggered on GPS Current Location click)
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationToast, setLocationToast] = useState<string | null>(null);
+
   // Manual Zoom state
   const [userZoom, setUserZoom] = useState<number | null>(null);
   const touchDistRef = useRef<number | null>(null);
-  const [activePinType, setActivePinType] = useState<LocationPinType>(locationPinType || 'character_pin');
+
+  // Pin style selector
+  const [activePinStyle, setActivePinStyle] = useState<PinStyleType>(
+    (locationPinType as PinStyleType) || 'animated_radar'
+  );
+
+  // Map Layers state
+  const [showLayersMenu, setShowLayersMenu] = useState(false);
+  const [baseLayerStyle, setBaseLayerStyle] = useState<MapBaseLayerStyle>(
+    isNightMode ? 'night' : 'standard'
+  );
+  const [layers, setLayers] = useState<MapLayerOptions>({
+    traffic: true,
+    transit: false,
+    fleetGIS: true
+  });
+
+  // Keep night mode synchronized
+  useEffect(() => {
+    if (isNightMode && baseLayerStyle === 'standard') {
+      setBaseLayerStyle('night');
+    } else if (!isNightMode && baseLayerStyle === 'night') {
+      setBaseLayerStyle('standard');
+    }
+  }, [isNightMode]);
 
   // Sync prop pinType if provided
   useEffect(() => {
     if (locationPinType) {
-      setActivePinType(locationPinType);
+      if (locationPinType === 'character_pin' || locationPinType === 'precision_crosshair' || locationPinType === 'animated_radar') {
+        setActivePinStyle(locationPinType as PinStyleType);
+      }
     }
   }, [locationPinType]);
 
@@ -109,11 +147,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   }, [fixedPinAddress, isDragging]);
 
-  const handleCyclePinType = () => {
-    const types: LocationPinType[] = ['character_pin', 'teardrop_3d', 'compact_boy'];
-    const next = types[(types.indexOf(activePinType) + 1) % types.length];
-    setActivePinType(next);
+  const handleCyclePinStyle = () => {
+    const styles: PinStyleType[] = ['animated_radar', 'precision_crosshair', 'character_pin'];
+    const next = styles[(styles.indexOf(activePinStyle) + 1) % styles.length];
+    setActivePinStyle(next);
     onChangePinType?.(next);
+    sounds.playPop();
   };
 
   // Simulated live nearby drivers before booking - dynamically anchored around current map center
@@ -124,7 +163,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     { id: 'd-truck', icon: '🚚', name: 'Truck', dx: 8.5, dy: 7.0, heading: 310 }
   ]);
 
-  // Subtle real-time drift of online nearby drivers
+  // Real-time drift of online nearby drivers
   useEffect(() => {
     if (status !== 'IDLE' && status !== 'FINDING_DRIVER') return;
     const interval = setInterval(() => {
@@ -309,10 +348,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     onAddressResolved?.(finalAddr, mapCenter);
   };
 
-  // Return to Device's GPS Position
+  // 🎯 Primary "USE CURRENT LOCATION" Handler
   const handleUseCurrentLocation = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
-    sounds.playTap();
+    sounds.playPing();
+    setIsLocating(true);
+    setLocationToast("Location Locked");
+    setTimeout(() => setLocationToast(null), 3000);
 
     const applyGPSCenter = (targetX: number, targetY: number) => {
       setMapCenter({ x: targetX, y: targetY });
@@ -320,6 +362,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       setLiveAddress(addr);
       onAddressResolved?.(addr, { x: targetX, y: targetY });
       onUseCurrentLocation?.();
+      setTimeout(() => setIsLocating(false), 1600);
     };
 
     if (navigator.geolocation) {
@@ -330,7 +373,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         () => {
           applyGPSCenter(DEFAULT_GPS_COORDS.x, DEFAULT_GPS_COORDS.y);
         },
-        { timeout: 3500 }
+        { timeout: 3000 }
       );
     } else {
       applyGPSCenter(DEFAULT_GPS_COORDS.x, DEFAULT_GPS_COORDS.y);
@@ -369,6 +412,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     setUserZoom(Math.max(0.75, Math.min(2.5, +(base + delta).toFixed(2))));
   };
 
+  // Base background styling according to layer
+  const mapBgClass = useMemo(() => {
+    if (baseLayerStyle === 'night') return 'bg-[#090f1e]';
+    if (baseLayerStyle === 'satellite') return 'bg-[#0e1713]';
+    return 'bg-white';
+  }, [baseLayerStyle]);
+
   return (
     <div 
       ref={mapContainerRef}
@@ -382,7 +432,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       onWheel={handleWheel}
       className={`relative w-full h-full overflow-hidden select-none touch-none ${
         status === 'IDLE' ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
-      } ${isNightMode ? 'bg-[#0b1329]' : 'bg-[#e2e8f0]'}`}
+      } ${mapBgClass}`}
     >
       
       {/* Zoomable & Panning Map Canvas Layer (Moves underneath the fixed pin!) */}
@@ -414,28 +464,99 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               <stop offset="100%" stopColor="#10b981" />
             </linearGradient>
 
+            {/* Satellite Terrain Grid Pattern */}
+            <pattern id="satGrid" width="6" height="6" patternUnits="userSpaceOnUse">
+              <path d="M 6 0 L 0 0 0 6" fill="none" stroke="#162e24" strokeWidth="0.25" opacity="0.6" />
+            </pattern>
+
+            {/* Metro Rail Dash Pattern */}
+            <pattern id="railTies" width="2" height="1.5" patternUnits="userSpaceOnUse">
+              <line x1="0" y1="0.75" x2="2" y2="0.75" stroke="#ffffff" strokeWidth="0.4" />
+            </pattern>
+
             <filter id="routeGlow" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="0.8" result="blur" />
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
+
+            <filter id="layerAura" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="0.5" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
           </defs>
+
+          {/* SATELLITE BASE: Textured Urban Terrain & Forest Foliage */}
+          {baseLayerStyle === 'satellite' && (
+            <>
+              <rect x="0" y="0" width="100" height="100" fill="url(#satGrid)" />
+              {/* Forest Reserves & Botanical Parks */}
+              <path d="M 5 5 Q 18 10 24 25 T 10 45 Z" fill="#0f3322" opacity="0.85" />
+              <path d="M 65 65 Q 85 70 88 90 T 55 95 Z" fill="#0d2b1d" opacity="0.85" />
+              <circle cx="82" cy="24" r="14" fill="#0b2418" opacity="0.8" />
+            </>
+          )}
+
+          {/* STANDARD BASE: Green Parks */}
+          {baseLayerStyle === 'standard' && (
+            <>
+              <path d="M 4 4 Q 16 8 20 22 T 8 40 Z" fill="#bbf7d0" opacity="0.7" />
+              <path d="M 68 68 Q 84 72 86 88 T 60 92 Z" fill="#bbf7d0" opacity="0.6" />
+            </>
+          )}
+
+          {/* NIGHT BASE: Cyber Dark Districts */}
+          {baseLayerStyle === 'night' && (
+            <>
+              <path d="M 4 4 Q 16 8 20 22 T 8 40 Z" fill="#0d1b2a" opacity="0.7" />
+              <path d="M 68 68 Q 84 72 86 88 T 60 92 Z" fill="#0d1b2a" opacity="0.6" />
+            </>
+          )}
 
           {/* River / Water body accent */}
           <path
             d="M -5 32 Q 25 38 45 28 T 95 36 T 110 32 L 110 40 Q 95 44 45 36 T -5 40 Z"
-            fill={isNightMode ? '#1e293b' : '#bfdbfe'}
-            opacity={isNightMode ? 0.35 : 0.6}
+            fill={
+              baseLayerStyle === 'satellite' ? '#091c28' :
+              baseLayerStyle === 'night' ? '#152438' : 
+              '#bfdbfe'
+            }
+            opacity={baseLayerStyle === 'night' ? 0.75 : 0.85}
           />
 
           {/* City Blocks / Commercial Districts */}
-          <rect x="8" y="12" width="16" height="14" rx="2" fill={isNightMode ? '#131e3a' : '#cbd5e1'} opacity="0.4" />
-          <rect x="28" y="10" width="22" height="12" rx="2" fill={isNightMode ? '#131e3a' : '#cbd5e1'} opacity="0.4" />
-          <rect x="58" y="8" width="24" height="15" rx="2" fill={isNightMode ? '#131e3a' : '#cbd5e1'} opacity="0.4" />
-          <rect x="12" y="66" width="20" height="18" rx="2" fill={isNightMode ? '#131e3a' : '#cbd5e1'} opacity="0.4" />
-          <rect x="42" y="70" width="28" height="16" rx="2" fill={isNightMode ? '#131e3a' : '#cbd5e1'} opacity="0.4" />
+          <rect x="8" y="12" width="16" height="14" rx="2" 
+            fill={baseLayerStyle === 'satellite' ? '#1a2923' : baseLayerStyle === 'night' ? '#131e3a' : '#cbd5e1'} 
+            stroke={baseLayerStyle === 'satellite' ? '#264236' : 'none'}
+            strokeWidth="0.3"
+            opacity={baseLayerStyle === 'satellite' ? 0.8 : 0.4} 
+          />
+          <rect x="28" y="10" width="22" height="12" rx="2" 
+            fill={baseLayerStyle === 'satellite' ? '#1c2d27' : baseLayerStyle === 'night' ? '#131e3a' : '#cbd5e1'} 
+            stroke={baseLayerStyle === 'satellite' ? '#264236' : 'none'}
+            strokeWidth="0.3"
+            opacity={baseLayerStyle === 'satellite' ? 0.8 : 0.4} 
+          />
+          <rect x="58" y="8" width="24" height="15" rx="2" 
+            fill={baseLayerStyle === 'satellite' ? '#182821' : baseLayerStyle === 'night' ? '#131e3a' : '#cbd5e1'} 
+            stroke={baseLayerStyle === 'satellite' ? '#264236' : 'none'}
+            strokeWidth="0.3"
+            opacity={baseLayerStyle === 'satellite' ? 0.8 : 0.4} 
+          />
+          <rect x="12" y="66" width="20" height="18" rx="2" 
+            fill={baseLayerStyle === 'satellite' ? '#1b2c25' : baseLayerStyle === 'night' ? '#131e3a' : '#cbd5e1'} 
+            stroke={baseLayerStyle === 'satellite' ? '#264236' : 'none'}
+            strokeWidth="0.3"
+            opacity={baseLayerStyle === 'satellite' ? 0.8 : 0.4} 
+          />
+          <rect x="42" y="70" width="28" height="16" rx="2" 
+            fill={baseLayerStyle === 'satellite' ? '#1a2a24' : baseLayerStyle === 'night' ? '#131e3a' : '#cbd5e1'} 
+            stroke={baseLayerStyle === 'satellite' ? '#264236' : 'none'}
+            strokeWidth="0.3"
+            opacity={baseLayerStyle === 'satellite' ? 0.8 : 0.4} 
+          />
 
           {/* Secondary Grid Streets */}
-          <g stroke={isNightMode ? '#1e293b' : '#cbd5e1'} strokeWidth="0.8" opacity="0.7">
+          <g stroke={baseLayerStyle === 'satellite' ? '#284438' : baseLayerStyle === 'night' ? '#1b283d' : '#cbd5e1'} strokeWidth="0.8" opacity="0.75">
             <line x1="0" y1="20" x2="100" y2="20" />
             <line x1="0" y1="40" x2="100" y2="40" />
             <line x1="0" y1="60" x2="100" y2="60" />
@@ -450,19 +571,85 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <path
             d="M 5 85 Q 20 40 50 18 T 95 15"
             fill="none"
-            stroke={isNightMode ? '#334155' : '#94a3b8'}
-            strokeWidth="2.5"
+            stroke={baseLayerStyle === 'satellite' ? '#5a7366' : baseLayerStyle === 'night' ? '#334155' : '#94a3b8'}
+            strokeWidth="2.8"
             strokeLinecap="round"
           />
 
           {/* Major City Arterial Roads */}
-          <g stroke={isNightMode ? '#27354f' : '#b0c4de'} strokeWidth="1.8">
+          <g stroke={baseLayerStyle === 'satellite' ? '#476255' : baseLayerStyle === 'night' ? '#27354f' : '#b0c4de'} strokeWidth="2.0">
             <line x1="10" y1="46" x2="90" y2="46" />
             <line x1="28" y1="10" x2="28" y2="90" />
             <line x1="48" y1="15" x2="48" y2="85" />
             <line x1="68" y1="10" x2="68" y2="90" />
             <line x1="15" y1="35" x2="85" y2="75" />
           </g>
+
+          {/* 🚦 MAP LAYER OVERLAY: LIVE TRAFFIC FLOW CONDITIONS */}
+          {layers.traffic && (
+            <g opacity="0.9">
+              {/* Green (Normal Flow, 40-50 km/h) */}
+              <line x1="10" y1="46" x2="40" y2="46" stroke="#22c55e" strokeWidth="1.2" strokeLinecap="round" opacity="0.85" />
+              <line x1="48" y1="15" x2="48" y2="45" stroke="#22c55e" strokeWidth="1.2" strokeLinecap="round" opacity="0.85" />
+              <path d="M 5 85 Q 20 40 38 25" fill="none" stroke="#22c55e" strokeWidth="1.4" strokeLinecap="round" opacity="0.8" />
+
+              {/* Amber (Moderate Traffic, 20-30 km/h) */}
+              <line x1="40" y1="46" x2="68" y2="46" stroke="#f59e0b" strokeWidth="1.4" strokeLinecap="round" />
+              <line x1="28" y1="35" x2="28" y2="65" stroke="#f59e0b" strokeWidth="1.4" strokeLinecap="round" />
+
+              {/* Red / Ruby (Heavy Congestion / Slowdown, 5-15 km/h) */}
+              <line x1="68" y1="46" x2="88" y2="46" stroke="#ef4444" strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="15" y1="35" x2="35" y2="45" stroke="#ef4444" strokeWidth="1.6" strokeLinecap="round" />
+              
+              {/* Congestion Pulse Dots */}
+              <circle cx="78" cy="46" r="1.4" fill="#ef4444" className="animate-ping" />
+              <circle cx="28" cy="50" r="1.2" fill="#f59e0b" className="animate-pulse" />
+            </g>
+          )}
+
+          {/* 🚊 MAP LAYER OVERLAY: TRANSIT & METRO LINES */}
+          {layers.transit && (
+            <g opacity="0.95">
+              {/* Hyderabad Metro Red Line (Corridor 1) */}
+              <path
+                d="M 5 12 L 28 35 L 50 50 L 75 70 L 95 85"
+                fill="none"
+                stroke="#dc2626"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray="4 2"
+              />
+              {/* Hyderabad Metro Blue Line (Hitec City Corridor) */}
+              <path
+                d="M 12 78 L 32 60 L 52 45 L 82 25 L 94 20"
+                fill="none"
+                stroke="#0284c7"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray="4 2"
+              />
+              {/* Metro Stations */}
+              <circle cx="28" cy="35" r="1.8" fill="#ffffff" stroke="#dc2626" strokeWidth="1" />
+              <circle cx="50" cy="50" r="2.2" fill="#ffffff" stroke="#dc2626" strokeWidth="1.2" />
+              <circle cx="75" cy="70" r="1.8" fill="#ffffff" stroke="#dc2626" strokeWidth="1" />
+              <circle cx="32" cy="60" r="1.8" fill="#ffffff" stroke="#0284c7" strokeWidth="1" />
+              <circle cx="52" cy="45" r="2.2" fill="#ffffff" stroke="#0284c7" strokeWidth="1.2" />
+              <circle cx="82" cy="25" r="1.8" fill="#ffffff" stroke="#0284c7" strokeWidth="1" />
+            </g>
+          )}
+
+          {/* 📡 MAP LAYER OVERLAY: FLEET TELEMATICS GIS HEATMAP */}
+          {layers.fleetGIS && (
+            <g opacity="0.75">
+              {/* Zone 1: Hitec City Hub Density */}
+              <circle cx="32" cy="36" r="12" fill="none" stroke="#06b6d4" strokeWidth="0.8" opacity="0.4" strokeDasharray="2 2" className="animate-pulse" />
+              <circle cx="32" cy="36" r="6" fill="#06b6d4" opacity="0.15" />
+              
+              {/* Zone 2: Secunderabad / Warangal Junction Hub Density */}
+              <circle cx="68" cy="54" r="14" fill="none" stroke="#10b981" strokeWidth="0.8" opacity="0.4" strokeDasharray="2 2" className="animate-pulse" />
+              <circle cx="68" cy="54" r="7" fill="#10b981" opacity="0.15" />
+            </g>
+          )}
 
           {/* 1. ACTUAL ROAD ROUTE: PICKUP -> DESTINATION */}
           {roadRoute && (
@@ -537,7 +724,35 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           )}
         </svg>
 
-        {/* Authentic POI Landmark Marker (Cyber Towers & Clock Tower strictly removed) */}
+        {/* Metro Station Badges (when transit layer enabled) */}
+        {layers.transit && (
+          <>
+            <div className="absolute top-[49%] left-[49%] -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+              <div className="px-1.5 py-0.5 rounded-full bg-red-600/90 text-white font-mono text-[8px] font-black shadow flex items-center gap-0.5">
+                <Train className="w-2.5 h-2.5" />
+                <span>Ameerpet Interchange</span>
+              </div>
+            </div>
+            <div className="absolute top-[23%] left-[80%] -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+              <div className="px-1.5 py-0.5 rounded-full bg-sky-600/90 text-white font-mono text-[8px] font-black shadow flex items-center gap-0.5">
+                <Train className="w-2.5 h-2.5" />
+                <span>Hitec Metro</span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Fleet Density Badges (when fleetGIS layer enabled) */}
+        {layers.fleetGIS && (
+          <div className="absolute top-[34%] left-[30%] -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/50 backdrop-blur-md text-[8px] font-bold text-cyan-300 shadow">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+              <span>18 Captains Active</span>
+            </div>
+          </div>
+        )}
+
+        {/* Authentic POI Landmark Marker */}
         <div 
           className="absolute top-[62%] left-[34%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
         >
@@ -565,7 +780,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           );
         })}
 
-        {/* 🏁 DESTINATION 3D PIN (When route is active) */}
+        {/* 🏁 DESTINATION PIN (When route is active) */}
         {drop && roadRoute && (
           <div
             style={{ top: `${dropJunction.y}%`, left: `${dropJunction.x}%` }}
@@ -602,7 +817,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 </span>
               </div>
 
-              {/* 3D Live Vehicle Marker (Directly on road, no background circle/box) */}
+              {/* Live Vehicle Marker */}
               <LiveMapVehicleMarker 
                 type={vehicleTierName || 'CAB'}
                 heading={liveDriverState.bearingDeg}
@@ -621,132 +836,224 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
       </div>
 
-      {/* 📍 THE PIN STAYS FIXED ON THE SCREEN WHILE THE MAP MOVES UNDERNEATH IT */}
+      {/* 📍 ANIMATED LOCATION PIN (STAYS FIXED ON SCREEN WHILE MAP MOVES UNDERNEATH) */}
       {showFixedPin && status === 'IDLE' && (
         <div 
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[88%] z-40 pointer-events-none select-none flex flex-col items-center"
         >
-          {/* Subtle instruction while moving / detected real-world address when stopped */}
-          {isMapMoving ? (
-            <div className="mb-2 px-3 py-1 bg-slate-900/90 backdrop-blur-md border border-emerald-500/60 rounded-full shadow-2xl flex items-center gap-1.5 animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
-              <span className="text-[11px] font-bold text-slate-100 tracking-wide">
-                Move map to select location
-              </span>
-            </div>
-          ) : (
-            <div className="mb-2 px-3 py-1 bg-slate-900/95 backdrop-blur-md border border-emerald-500/50 rounded-full shadow-2xl flex items-center gap-1.5 max-w-[270px] animate-in fade-in">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-              <span className="text-[11px] font-black text-white truncate">
-                {liveAddress || pickup || DEFAULT_GPS_ADDRESS}
-              </span>
-            </div>
-          )}
-
-          {/* 3D Boy Pin Pointer (Slight lift effect when dragging map) */}
-          <div className={`transition-transform duration-200 ease-out flex flex-col items-center ${
-            isMapMoving ? '-translate-y-2.5 scale-105' : 'translate-y-0 scale-100'
-          }`}>
-            <Boy3dPin 
-              showAddressBadge={false}
-              pinType={activePinType}
-            />
-          </div>
+          <AnimatedLocationPin
+            address={liveAddress || pickup || DEFAULT_GPS_ADDRESS}
+            isMapMoving={isMapMoving}
+            isLocating={isLocating}
+            pinStyle={activePinStyle}
+            showAddressBadge={true}
+            onCycleStyle={handleCyclePinStyle}
+          />
         </div>
       )}
 
-      {/* TOP FLOATING ROUTE INFORMATION HUD (Cleanly below header bar, never hidden!) */}
-      {roadRoute && (
-        <div className="absolute top-24 left-4 right-4 z-30 pointer-events-auto">
-          <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3 shadow-2xl space-y-2">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-lg bg-blue-500/20 text-brand-blue font-black text-[10px] uppercase tracking-wider border border-blue-500/30">
-                  Actual Road Route
-                </span>
-                <span className="text-xs font-black text-white">
-                  {roadRoute.totalDistanceKm} km
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-black">
-                <Clock className="w-3.5 h-3.5" />
-                <span>~{roadRoute.estimatedTravelTimeMin} mins</span>
-              </div>
-            </div>
-
-            {/* Pickup & Destination Addresses (No coordinates exposed!) */}
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center gap-2 text-slate-300 truncate">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></span>
-                <span className="font-bold truncate">{roadRoute.pickupAddress}</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-300 truncate">
-                <span className="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0"></span>
-                <span className="font-bold truncate">{roadRoute.dropAddress}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Map Style & Pin Type Overlay Controls (Cleanly below header, never hidden!) */}
-      <div className="absolute top-24 right-3.5 z-30 flex flex-col gap-2">
-        {onToggleNightMode && (
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleNightMode();
-            }}
-            title="Toggle Map Style (Day/Night)"
-            className="w-8 h-8 rounded-full bg-slate-900/85 border border-slate-700 backdrop-blur-md text-slate-300 flex items-center justify-center shadow-lg hover:bg-slate-800 transition active:scale-95"
-          >
-            {isNightMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-500" />}
-          </button>
-        )}
-
-        {/* Location Pin Pointer Style Switcher */}
+      {/* 🧭 RIGHT-SIDE FLOATING MAP CONTROLS (Layers, Zoom Reset, Pin Toggle) */}
+      <div className="absolute top-24 right-3.5 z-30 flex flex-col items-end gap-2 pointer-events-auto">
+        
+        {/* 1. MAP LAYERS BUTTON */}
         <button 
           onClick={(e) => {
             e.stopPropagation();
-            handleCyclePinType();
+            sounds.playPop();
+            setShowLayersMenu(!showLayersMenu);
           }}
-          title={`Pin Type: ${activePinType === 'character_pin' ? 'Sleek Character Pin' : activePinType === 'teardrop_3d' ? '3D Teardrop Pin' : 'Compact Character'} (Click to switch)`}
-          className="w-8 h-8 rounded-full bg-slate-900/85 border border-slate-700 backdrop-blur-md text-emerald-400 flex items-center justify-center shadow-lg hover:bg-slate-800 transition active:scale-95"
+          title="Map Layers (Traffic, Satellite, Transit, GIS)"
+          className={`w-9 h-9 rounded-2xl backdrop-blur-md border flex items-center justify-center shadow-xl transition active:scale-95 ${
+            showLayersMenu 
+              ? 'bg-blue-600 border-blue-400 text-white shadow-blue-500/40 ring-2 ring-blue-500/30' 
+              : 'bg-slate-900/90 border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800'
+          }`}
         >
-          <MapPin className="w-4 h-4 text-emerald-400" />
+          <Layers className="w-4 h-4 text-blue-400" />
         </button>
 
-        {/* Reset Zoom Button */}
+        {/* 2. PIN STYLE CYCLE BUTTON */}
+        {status === 'IDLE' && (
+          <button 
+            onClick={handleCyclePinStyle}
+            title={`Pin Style: ${activePinStyle}`}
+            className="w-9 h-9 rounded-2xl bg-slate-900/90 border border-slate-700/80 backdrop-blur-md text-amber-400 flex items-center justify-center shadow-xl hover:bg-slate-800 transition active:scale-95"
+          >
+            <Sparkles className="w-4 h-4 text-amber-400" />
+          </button>
+        )}
+
+        {/* 4. RESET AUTO-FIT ZOOM */}
         {userZoom !== null && (
           <button 
             onClick={(e) => {
               e.stopPropagation();
               setUserZoom(null);
             }}
-            title="Reset to Auto-Fit"
-            className="w-8 h-8 rounded-full bg-slate-900/85 border border-slate-700 backdrop-blur-md text-slate-300 flex items-center justify-center shadow-lg hover:bg-slate-800 transition active:scale-95 text-[10px] font-mono font-bold"
+            title="Reset Zoom"
+            className="w-9 h-9 rounded-2xl bg-slate-900/90 border border-slate-700/80 backdrop-blur-md text-slate-300 flex items-center justify-center shadow-xl hover:bg-slate-800 transition active:scale-95"
           >
             <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
           </button>
         )}
       </div>
 
-      {/* “Use Current Location” button on the map (Cleanly below Zaldi Fast, never hidden!) */}
-      {status === 'IDLE' && (
-        <div className="absolute top-24 left-3.5 z-30">
-          <button
-            onClick={handleUseCurrentLocation}
-            title="Return map to device GPS position"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 hover:border-emerald-500/80 backdrop-blur-md text-white text-[11px] font-bold shadow-xl hover:bg-slate-800 transition active:scale-95 group"
-          >
-            <Navigation className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-45 transition-transform flex-shrink-0" />
-            <span>Use Current Location</span>
-          </button>
+      {/* 🗺️ INTERACTIVE MAP LAYERS OVERLAY PANEL */}
+      {showLayersMenu && (
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-24 right-14 z-40 w-64 bg-slate-900/95 backdrop-blur-xl border border-slate-700/90 rounded-2xl p-3.5 shadow-2xl animate-in fade-in slide-in-from-right-3 duration-200 pointer-events-auto text-xs text-slate-200 space-y-3"
+        >
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div className="flex items-center gap-1.5 font-black text-white">
+              <Layers className="w-4 h-4 text-blue-400" />
+              <span>Map Layers</span>
+            </div>
+            <button 
+              onClick={() => setShowLayersMenu(false)}
+              className="text-slate-400 hover:text-white p-0.5"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Base Layer Switcher */}
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              Base Map Style
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                onClick={() => {
+                  setBaseLayerStyle('standard');
+                  if (isNightMode) onToggleNightMode?.();
+                  sounds.playPop();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition text-center ${
+                  baseLayerStyle === 'standard'
+                    ? 'bg-blue-600/20 border-blue-500 text-white font-bold'
+                    : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-[10px]">Streets</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setBaseLayerStyle('night');
+                  if (!isNightMode) onToggleNightMode?.();
+                  sounds.playPop();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition text-center ${
+                  baseLayerStyle === 'night'
+                    ? 'bg-blue-600/20 border-blue-500 text-white font-bold'
+                    : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="text-[10px]">Night</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setBaseLayerStyle('satellite');
+                  sounds.playPop();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition text-center ${
+                  baseLayerStyle === 'satellite'
+                    ? 'bg-emerald-600/20 border-emerald-500 text-white font-bold'
+                    : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Compass className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[10px]">Satellite</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Toggleable Layer Overlays */}
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              Layer Overlays
+            </div>
+            <div className="space-y-1.5">
+              {/* Traffic Flow */}
+              <div 
+                onClick={() => {
+                  setLayers(prev => ({ ...prev, traffic: !prev.traffic }));
+                  sounds.playPop();
+                }}
+                className="flex items-center justify-between p-2 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-[11px] font-semibold">Live Traffic Flow</span>
+                </div>
+                <div className={`w-7 h-4 rounded-full transition-colors relative flex items-center p-0.5 ${
+                  layers.traffic ? 'bg-emerald-500' : 'bg-slate-700'
+                }`}>
+                  <div className={`w-3 h-3 rounded-full bg-white transition-transform ${
+                    layers.traffic ? 'translate-x-3' : 'translate-x-0'
+                  }`} />
+                </div>
+              </div>
+
+              {/* Transit & Metro */}
+              <div 
+                onClick={() => {
+                  setLayers(prev => ({ ...prev, transit: !prev.transit }));
+                  sounds.playPop();
+                }}
+                className="flex items-center justify-between p-2 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Train className="w-3.5 h-3.5 text-sky-400" />
+                  <span className="text-[11px] font-semibold">Metro & Transit</span>
+                </div>
+                <div className={`w-7 h-4 rounded-full transition-colors relative flex items-center p-0.5 ${
+                  layers.transit ? 'bg-sky-500' : 'bg-slate-700'
+                }`}>
+                  <div className={`w-3 h-3 rounded-full bg-white transition-transform ${
+                    layers.transit ? 'translate-x-3' : 'translate-x-0'
+                  }`} />
+                </div>
+              </div>
+
+              {/* Fleet Telematics Heatmap */}
+              <div 
+                onClick={() => {
+                  setLayers(prev => ({ ...prev, fleetGIS: !prev.fleetGIS }));
+                  sounds.playPop();
+                }}
+                className="flex items-center justify-between p-2 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Radio className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-[11px] font-semibold">Fleet GIS Density</span>
+                </div>
+                <div className={`w-7 h-4 rounded-full transition-colors relative flex items-center p-0.5 ${
+                  layers.fleetGIS ? 'bg-cyan-500' : 'bg-slate-700'
+                }`}>
+                  <div className={`w-3 h-3 rounded-full bg-white transition-transform ${
+                    layers.fleetGIS ? 'translate-x-3' : 'translate-x-0'
+                  }`} />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* “Confirm Location” floating action button on map when picking pickup */}
+      {/* 🎯 CURRENT LOCATION TOAST NOTIFICATION */}
+      {locationToast && (
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 px-3.5 py-1.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+          <Navigation className="w-3.5 h-3.5 text-slate-950" />
+          <span>{locationToast}</span>
+        </div>
+      )}
+
+      {/* “CONFIRM LOCATION” FLOATING ACTION BUTTON ON MAP (WHEN PICKING PICKUP) */}
       {status === 'IDLE' && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 w-[90%] max-w-xs pointer-events-auto">
           <button
@@ -761,14 +1068,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             <CheckCircle2 className="w-4 h-4 text-white flex-shrink-0" />
             <span>Confirm Location</span>
           </button>
-        </div>
-      )}
-
-      {/* Safety & Drag Hint */}
-      {status !== 'IDLE' && (
-        <div className="absolute bottom-2 left-3 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/85 border border-slate-800/90 backdrop-blur-md text-[10px] font-bold text-slate-300 pointer-events-none">
-          <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Live GPS Road Tracking</span>
         </div>
       )}
 

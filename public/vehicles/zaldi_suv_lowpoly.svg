@@ -1,0 +1,45 @@
+<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Front Wheel (Large Faceted Low-Poly) -->
+  <polygon points="360,375 415,340 425,280 395,240 340,275 330,335" fill="#0f172a" />
+  <polygon points="360,375 330,335 340,275 370,305" fill="#1e293b" />
+  <polygon points="365,340 395,320 405,290 385,270 360,295" fill="#c084fc" />
+
+  <!-- Rear Wheel (Large Faceted Low-Poly) -->
+  <polygon points="135,395 190,360 200,300 170,260 115,295 105,355" fill="#0f172a" />
+  <polygon points="135,395 105,355 115,295 145,325" fill="#1e293b" />
+  <polygon points="140,360 170,340 180,310 160,290 135,315" fill="#c084fc" />
+
+  <!-- Chunky Wheel Arches (Matte Black) -->
+  <polygon points="325,325 345,265 410,255 425,295" fill="#0f172a" />
+  <polygon points="100,345 120,285 185,275 200,315" fill="#0f172a" />
+
+  <!-- Lower Body / Chassis (Deep Midnight Purple) -->
+  <polygon points="105,335 240,355 350,335 440,285 330,270 190,280 80,300" fill="#1e1b4b" />
+  <polygon points="240,355 350,335 440,285 415,260 235,305" fill="#2e1065" />
+  <!-- Front Skid Plate (Silver) -->
+  <polygon points="410,300 445,285 435,265 400,280" fill="#cbd5e1" />
+
+  <!-- Front Muscular Hood (Faceted Purple) -->
+  <polygon points="330,270 440,285 415,235 315,225" fill="#581c87" />
+  <polygon points="415,235 440,285 455,260 425,225" fill="#3b0764" />
+  <!-- Grille & Headlights -->
+  <polygon points="425,250 450,240 440,230 415,240" fill="#facc15" />
+
+  <!-- Boxy Tall Greenhouse Cabin (Faceted Glass) -->
+  <polygon points="150,250 315,225 285,160 170,175" fill="#38bdf8" fill-opacity="0.9" />
+  <polygon points="315,225 375,220 345,160 285,160" fill="#93c5fd" fill-opacity="0.85" />
+  <polygon points="150,250 170,175 130,190 115,260" fill="#0284c7" />
+
+  <!-- HIGH-CONTRAST FLAT ROOF & ROOF RAILS (Radiant Lavender/Silver) -->
+  <!-- Roof Flank -->
+  <polygon points="160,175 335,160 345,148 170,163" fill="#a855f7" />
+  <!-- Roof Top Surface (Radiant Lavender) -->
+  <polygon points="170,163 345,148 300,125 135,140" fill="#c084fc" />
+  <!-- Roof Rack Rails (Electric Cyan Accent) -->
+  <polygon points="180,150 320,138 322,143 182,155" fill="#38bdf8" />
+
+  <!-- ZALDI 'Z' EMBLEM on the SUV Roof (Vivid Neon Gold) -->
+  <polygon points="205,152 255,144 245,149 220,153" fill="#facc15" />
+  <polygon points="245,149 220,153 240,158 210,164" fill="#eab308" />
+  <polygon points="210,164 240,158 260,154 230,160" fill="#facc15" />
+</svg>

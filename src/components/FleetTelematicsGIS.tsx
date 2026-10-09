@@ -3,7 +3,7 @@ import {
   Radio, Navigation, Zap, Gauge, AlertTriangle, ShieldCheck, 
   MapPin, Filter, Search, ChevronRight, Activity, ArrowUpRight, 
   BatteryCharging, Clock, Layers, Car, RefreshCw, Eye, Sparkles,
-  Compass, Play, Pause
+  Compass, Play, Pause, Box, Download
 } from 'lucide-react';
 import { 
   FLEET_TELEMATICS_UNITS, 
@@ -13,6 +13,7 @@ import {
   VehicleEngineStatus 
 } from '../services/telematicsData';
 import { Vehicle5dIcon, LiveMap5dVehicleMarker, getVehicleTheme } from './Vehicle5dIcon';
+import { LowPolyVehicleStudio } from './LowPolyVehicleStudio';
 import { sounds } from '../services/audio';
 
 interface FleetTelematicsGISProps {
@@ -31,6 +32,7 @@ export const FleetTelematicsGIS: React.FC<FleetTelematicsGISProps> = ({
   const [showTrails, setShowTrails] = useState(true);
   const [isLiveStreamActive, setIsLiveStreamActive] = useState(true);
   const [gisViewMode, setGisViewMode] = useState<'NIGHT_TELEMATICS' | 'DAY_SATELLITE'>('NIGHT_TELEMATICS');
+  const [showStudio, setShowStudio] = useState(false);
 
   // Selected vehicle object
   const selectedVehicle = useMemo(() => {
@@ -128,7 +130,7 @@ export const FleetTelematicsGIS: React.FC<FleetTelematicsGISProps> = ({
             }`}
           >
             {isLiveStreamActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            <span>{isLiveStreamActive ? 'Live GPS Stream' : 'Stream Paused'}</span>
+            <span>{isLiveStreamActive ? 'Live Telematics Stream' : 'Stream Paused'}</span>
           </button>
 
           <button
@@ -140,6 +142,18 @@ export const FleetTelematicsGIS: React.FC<FleetTelematicsGISProps> = ({
           >
             <Layers className="w-3.5 h-3.5 text-blue-400" />
             <span>{gisViewMode === 'NIGHT_TELEMATICS' ? 'Dark Vector GIS' : 'Light Cartography'}</span>
+          </button>
+
+          {/* 3D Asset Studio & GLB Downloader Button */}
+          <button
+            onClick={() => {
+              sounds.playPop();
+              setShowStudio(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-bold transition shadow-md"
+          >
+            <Box className="w-3.5 h-3.5 text-amber-400" />
+            <span>3D Low-Poly Hub & GLB</span>
           </button>
         </div>
       </div>
@@ -161,7 +175,6 @@ export const FleetTelematicsGIS: React.FC<FleetTelematicsGISProps> = ({
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg space-y-1">
           <div className="flex items-center justify-between text-xs text-slate-400 font-bold uppercase">
             <span>Avg Fleet Power</span>
-            <BatteryCharging className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-black text-emerald-400">{avgBatteryOrFuel}%</div>
           <div className="text-[11px] font-semibold text-slate-400">Zero Critical Depletions</div>
@@ -170,7 +183,6 @@ export const FleetTelematicsGIS: React.FC<FleetTelematicsGISProps> = ({
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg space-y-1">
           <div className="flex items-center justify-between text-xs text-slate-400 font-bold uppercase">
             <span>Eco-Drive Score</span>
-            <Gauge className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-2xl font-black text-blue-400">{avgEcoScore} / 100</div>
           <div className="text-[11px] font-semibold text-emerald-400">98.2% Speed Compliance</div>
@@ -505,7 +517,6 @@ export const FleetTelematicsGIS: React.FC<FleetTelematicsGISProps> = ({
             <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1">
               <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase">
                 <span>{selectedVehicle.powerType} Level</span>
-                <BatteryCharging className="w-3.5 h-3.5 text-emerald-400" />
               </div>
               <div className="text-2xl font-black text-emerald-400 font-mono">
                 {selectedVehicle.fuelOrBatteryPercent}%
@@ -519,7 +530,6 @@ export const FleetTelematicsGIS: React.FC<FleetTelematicsGISProps> = ({
             <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1">
               <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase">
                 <span>Eco Score</span>
-                <Activity className="w-3.5 h-3.5 text-blue-400" />
               </div>
               <div className="text-2xl font-black text-blue-400 font-mono">
                 {selectedVehicle.ecoScore} <span className="text-xs text-slate-500 font-normal">/ 100</span>
@@ -566,13 +576,24 @@ export const FleetTelematicsGIS: React.FC<FleetTelematicsGISProps> = ({
           </div>
 
           {/* Direct Dispatch & Fleet Action Button */}
-          <div className="pt-1 flex gap-2">
+          <div className="pt-1 flex flex-col gap-2">
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setShowStudio(true);
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-amber-500/40 text-amber-300 font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md"
+            >
+              <Box className="w-4 h-4 text-amber-400" />
+              <span>Inspect Low-Poly 3D Mesh & Download GLB/PNG</span>
+            </button>
+
             <button
               onClick={() => {
                 sounds.playSuccess();
                 onSelectVehicleForDispatch?.(selectedVehicle);
               }}
-              className="flex-1 py-3 px-4 rounded-2xl bg-cyan-500 hover:bg-cyan-600 active:scale-98 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-xl shadow-cyan-500/20 transition"
+              className="w-full py-3 px-4 rounded-2xl bg-cyan-500 hover:bg-cyan-600 active:scale-98 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-xl shadow-cyan-500/20 transition"
             >
               <Zap className="w-4 h-4 text-slate-950" />
               <span>Dispatch Order to Unit</span>
@@ -582,6 +603,25 @@ export const FleetTelematicsGIS: React.FC<FleetTelematicsGISProps> = ({
         </div>
 
       </div>
+
+      {/* 3D Vehicle Studio Modal */}
+      {showStudio && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto no-scrollbar">
+            <LowPolyVehicleStudio
+              initialVehicle={
+                selectedVehicle.vehicleType.toLowerCase().includes('bike') ? 'bike' :
+                selectedVehicle.vehicleType.toLowerCase().includes('auto') ? 'auto' :
+                selectedVehicle.vehicleType.toLowerCase().includes('suv') ? 'suv' :
+                selectedVehicle.vehicleType.toLowerCase().includes('truck') ? 'truck' :
+                selectedVehicle.vehicleType.toLowerCase().includes('parcel') ? 'parcel' :
+                'sedan'
+              }
+              onClose={() => setShowStudio(false)}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

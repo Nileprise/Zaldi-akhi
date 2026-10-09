@@ -1,10 +1,28 @@
 import React from 'react';
-import bikeImg from '../assets/images/bike_3d_transparent.png';
-import autoImg from '../assets/images/auto_3d_transparent.png';
-import cabImg from '../assets/images/cab_3d_transparent.png';
-import suvImg from '../assets/images/suv_3d_transparent.png';
-import truckImg from '../assets/images/truck_3d_transparent.png';
-import parcelImg from '../assets/images/parcel_3d_transparent.png';
+
+// Crisp Low-Poly Assets (Separate PNGs with transparent background, high-contrast roof/body, Zaldi Z, no baked shadow)
+import bikeLowPolyPng from '../assets/images/zaldi_bike_lowpoly.png';
+import autoLowPolyPng from '../assets/images/zaldi_auto_lowpoly.png';
+import sedanLowPolyPng from '../assets/images/zaldi_sedan_lowpoly.png';
+import suvLowPolyPng from '../assets/images/zaldi_suv_lowpoly.png';
+import truckLowPolyPng from '../assets/images/zaldi_truck_lowpoly.png';
+import parcelLowPolyPng from '../assets/images/zaldi_parcel_lowpoly.png';
+
+// 64px Silhouette Optimized versions
+import bikeLowPoly64 from '../assets/images/zaldi_bike_lowpoly_64.png';
+import autoLowPoly64 from '../assets/images/zaldi_auto_lowpoly_64.png';
+import sedanLowPoly64 from '../assets/images/zaldi_sedan_lowpoly_64.png';
+import suvLowPoly64 from '../assets/images/zaldi_suv_lowpoly_64.png';
+import truckLowPoly64 from '../assets/images/zaldi_truck_lowpoly_64.png';
+import parcelLowPoly64 from '../assets/images/zaldi_parcel_lowpoly_64.png';
+
+// Legacy high-res photoreal fallbacks
+import bikePhotoreal from '../assets/images/bike_3d_transparent.png';
+import autoPhotoreal from '../assets/images/auto_3d_transparent.png';
+import cabPhotoreal from '../assets/images/cab_3d_transparent.png';
+import suvPhotoreal from '../assets/images/suv_3d_transparent.png';
+import truckPhotoreal from '../assets/images/truck_3d_transparent.png';
+import parcelPhotoreal from '../assets/images/parcel_3d_transparent.png';
 import destinationImg from '../assets/images/destination_3d_transparent.png';
 
 export type VehicleTierType = 'BIKE' | 'AUTO' | 'CAB' | 'PREMIUM' | 'TRUCK' | 'PARCEL' | string;
@@ -16,6 +34,10 @@ export interface VehicleThemeConfig {
   badgeText: string;
   highlightGradient: string;
   label: string;
+  lowPolyPng: string;
+  lowPoly64: string;
+  photorealPng: string;
+  glbModelPath: string;
 }
 
 export const VEHICLE_5D_THEMES: Record<string, VehicleThemeConfig> = {
@@ -25,7 +47,11 @@ export const VEHICLE_5D_THEMES: Record<string, VehicleThemeConfig> = {
     badgeBg: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
     badgeText: 'text-cyan-400',
     highlightGradient: 'from-cyan-400/25 via-transparent to-transparent',
-    label: 'Bike Moto'
+    label: 'Zaldi Moto EV',
+    lowPolyPng: bikeLowPolyPng,
+    lowPoly64: bikeLowPoly64,
+    photorealPng: bikePhotoreal,
+    glbModelPath: '/models/zaldi-bike-lowpoly.glb'
   },
   AUTO: {
     glowColor: 'rgba(245, 158, 11, 0.55)',
@@ -33,7 +59,11 @@ export const VEHICLE_5D_THEMES: Record<string, VehicleThemeConfig> = {
     badgeBg: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
     badgeText: 'text-amber-400',
     highlightGradient: 'from-amber-400/25 via-transparent to-transparent',
-    label: 'Auto 3W'
+    label: 'Zaldi TukTuk 3W',
+    lowPolyPng: autoLowPolyPng,
+    lowPoly64: autoLowPoly64,
+    photorealPng: autoPhotoreal,
+    glbModelPath: '/models/zaldi-auto-lowpoly.glb'
   },
   CAB: {
     glowColor: 'rgba(59, 130, 246, 0.55)',
@@ -41,7 +71,11 @@ export const VEHICLE_5D_THEMES: Record<string, VehicleThemeConfig> = {
     badgeBg: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     badgeText: 'text-blue-400',
     highlightGradient: 'from-blue-400/25 via-transparent to-transparent',
-    label: 'Cab Prime'
+    label: 'Zaldi Go Sedan',
+    lowPolyPng: sedanLowPolyPng,
+    lowPoly64: sedanLowPoly64,
+    photorealPng: cabPhotoreal,
+    glbModelPath: '/models/zaldi-sedan-lowpoly.glb'
   },
   PREMIUM: {
     glowColor: 'rgba(168, 85, 247, 0.6)',
@@ -49,7 +83,11 @@ export const VEHICLE_5D_THEMES: Record<string, VehicleThemeConfig> = {
     badgeBg: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
     badgeText: 'text-purple-400',
     highlightGradient: 'from-purple-400/25 via-transparent to-transparent',
-    label: 'Prime SUV'
+    label: 'Zaldi Prime SUV',
+    lowPolyPng: suvLowPolyPng,
+    lowPoly64: suvLowPoly64,
+    photorealPng: suvPhotoreal,
+    glbModelPath: '/models/zaldi-suv-lowpoly.glb'
   },
   TRUCK: {
     glowColor: 'rgba(99, 102, 241, 0.55)',
@@ -57,7 +95,11 @@ export const VEHICLE_5D_THEMES: Record<string, VehicleThemeConfig> = {
     badgeBg: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
     badgeText: 'text-indigo-400',
     highlightGradient: 'from-indigo-400/25 via-transparent to-transparent',
-    label: 'Mini Truck'
+    label: 'Zaldi Haul Mini-Truck',
+    lowPolyPng: truckLowPolyPng,
+    lowPoly64: truckLowPoly64,
+    photorealPng: truckPhotoreal,
+    glbModelPath: '/models/zaldi-truck-lowpoly.glb'
   },
   PARCEL: {
     glowColor: 'rgba(16, 185, 129, 0.55)',
@@ -65,29 +107,27 @@ export const VEHICLE_5D_THEMES: Record<string, VehicleThemeConfig> = {
     badgeBg: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     badgeText: 'text-emerald-400',
     highlightGradient: 'from-emerald-400/25 via-transparent to-transparent',
-    label: 'Fast Parcel'
+    label: 'Zaldi Express Parcel',
+    lowPolyPng: parcelLowPolyPng,
+    lowPoly64: parcelLowPoly64,
+    photorealPng: parcelPhotoreal,
+    glbModelPath: '/models/zaldi-parcel-lowpoly.glb'
   }
-};
-
-export const getVehicleImageSrc = (type: string): string => {
-  const t = type.toLowerCase();
-  if (t.includes('parcel') || t.includes('package') || t.includes('box') || t.includes('📦')) return parcelImg;
-  if (t.includes('suv') || t.includes('xl') || t.includes('premium') || t.includes('🚙')) return suvImg;
-  if (t.includes('bike') || t.includes('moto') || t.includes('🏍')) return bikeImg;
-  if (t.includes('auto') || t.includes('3w') || t.includes('🛺')) return autoImg;
-  if (t.includes('truck') || t.includes('cargo') || t.includes('mini') || t.includes('🚚')) return truckImg;
-  if (t.includes('cab') || t.includes('car') || t.includes('prime') || t.includes('sedan') || t.includes('taxi') || t.includes('🚕')) return cabImg;
-  return cabImg;
 };
 
 export const getVehicleTheme = (type: string): VehicleThemeConfig => {
   const t = type.toUpperCase();
-  if (t.includes('BIKE')) return VEHICLE_5D_THEMES.BIKE;
-  if (t.includes('AUTO')) return VEHICLE_5D_THEMES.AUTO;
-  if (t.includes('PREMIUM') || t.includes('SUV')) return VEHICLE_5D_THEMES.PREMIUM;
-  if (t.includes('TRUCK')) return VEHICLE_5D_THEMES.TRUCK;
-  if (t.includes('PARCEL')) return VEHICLE_5D_THEMES.PARCEL;
+  if (t.includes('BIKE') || t.includes('MOTO') || t.includes('🏍')) return VEHICLE_5D_THEMES.BIKE;
+  if (t.includes('AUTO') || t.includes('3W') || t.includes('🛺')) return VEHICLE_5D_THEMES.AUTO;
+  if (t.includes('PREMIUM') || t.includes('SUV') || t.includes('XL') || t.includes('🚙')) return VEHICLE_5D_THEMES.PREMIUM;
+  if (t.includes('TRUCK') || t.includes('HAUL') || t.includes('CARGO') || t.includes('🚚')) return VEHICLE_5D_THEMES.TRUCK;
+  if (t.includes('PARCEL') || t.includes('PACKAGE') || t.includes('BOX') || t.includes('📦')) return VEHICLE_5D_THEMES.PARCEL;
   return VEHICLE_5D_THEMES.CAB;
+};
+
+export const getVehicleImageSrc = (type: string, isSmall = false): string => {
+  const theme = getVehicleTheme(type);
+  return isSmall ? theme.lowPoly64 : theme.lowPolyPng;
 };
 
 interface Vehicle5dIconProps {
@@ -101,24 +141,25 @@ interface Vehicle5dIconProps {
 }
 
 /**
- * 5D Modern Vehicle Icon Component
- * Features:
- * 1. 3D Isometric transparent asset with zero container box
- * 2. Directional depth lighting & specular glass reflection flare
- * 3. Chromatic tier-specific floor neon underglow (5D spatial aura)
- * 4. Micro-perspective tilt & tactile float animation
- * 5. Multi-stage ambient occlusion ground contact shadow
+ * 5D Modern Vehicle Icon Component with Low-Poly Geometry
+ * - Strong silhouette readable at 32-64px
+ * - High-contrast roof/body
+ * - Zaldi Z visible without overwhelming
+ * - Transparent background (NO baked ground/shadow)
+ * - Dynamic ground contact shadow & tier neon aura
+ * - Rotation-ready for real-time map movement
  */
 export const Vehicle5dIcon: React.FC<Vehicle5dIconProps> = ({
   type,
-  size = 44,
+  size = 48,
   className = "",
   heading = 0,
   isSelected = false,
   showAura = true
 }) => {
-  const src = getVehicleImageSrc(type);
   const theme = getVehicleTheme(type);
+  const isSmall = size <= 48;
+  const src = isSmall ? theme.lowPoly64 : theme.lowPolyPng;
 
   return (
     <div 
@@ -129,11 +170,11 @@ export const Vehicle5dIcon: React.FC<Vehicle5dIconProps> = ({
         perspective: '800px'
       }}
     >
-      {/* Dimension 4: Tier-specific Chromatic Floor Glow Aura */}
+      {/* Dynamic Tier Neon Underglow Aura (zero baked shadow in PNG) */}
       {showAura && (
         <div 
-          className={`absolute bottom-0 w-[90%] h-[35%] rounded-full blur-md transition-all duration-300 pointer-events-none ${
-            isSelected ? 'opacity-85 scale-125' : 'opacity-35 group-hover:opacity-65'
+          className={`absolute bottom-0 w-[85%] h-[30%] rounded-full blur-md transition-all duration-300 pointer-events-none ${
+            isSelected ? 'opacity-90 scale-125' : 'opacity-35 group-hover:opacity-70'
           }`}
           style={{
             backgroundColor: theme.glowColor,
@@ -142,14 +183,14 @@ export const Vehicle5dIcon: React.FC<Vehicle5dIconProps> = ({
         />
       )}
 
-      {/* Dimension 5: Floor Contact Occlusion Shadow */}
+      {/* Dynamic Contact Occlusion Shadow beneath wheels */}
       <div 
-        className={`absolute bottom-0.5 w-[75%] h-[20%] bg-black/60 rounded-full blur-[2px] transition-all duration-300 pointer-events-none ${
+        className={`absolute bottom-0.5 w-[75%] h-[18%] bg-black/60 rounded-full blur-[2px] transition-all duration-300 pointer-events-none ${
           isSelected ? 'scale-90 opacity-40' : 'scale-100 opacity-60'
         }`}
       />
 
-      {/* Dimension 1 & 2 & 3: 3D Render Image with Perspective Tilt & Floating Elevation */}
+      {/* Low-Poly 3D Cutout with Float & Rotation */}
       <div 
         className={`relative w-full h-full flex items-center justify-center transition-all duration-300 ease-out ${
           isSelected 
@@ -161,18 +202,13 @@ export const Vehicle5dIcon: React.FC<Vehicle5dIconProps> = ({
           transform: heading ? `rotate(${heading}deg)` : undefined
         }}
       >
-        {/* Specular Sheen Reflection Highlight */}
-        <div 
-          className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/15 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full"
-          style={{ mixBlendMode: 'overlay' }}
-        />
-
         <img
           src={src}
-          alt={type}
-          className="w-full h-full object-contain pointer-events-none filter drop-shadow-[0_6px_12px_rgba(0,0,0,0.65)]"
+          alt={theme.label}
+          className="w-full h-full object-contain pointer-events-none filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.65)]"
           onError={(e) => {
-            e.currentTarget.style.display = 'none';
+            // Fallback to photoreal if low-poly image has issue
+            e.currentTarget.src = theme.photorealPng;
           }}
         />
       </div>
@@ -197,24 +233,26 @@ interface LiveMap5dVehicleMarkerProps {
 }
 
 /**
- * Live Map 5D Vehicle Marker
- * Direct-on-road placement with realistic dynamic headlight projection,
- * ambient ground shadow, and heading rotation. Zero background box.
+ * Live Map Low-Poly Vehicle Marker
+ * - Clean silhouette readable at 32-64px
+ * - Dynamic heading rotation along real-time road coordinates
+ * - Dynamic headlight projection beam & contact shadow on road
+ * - High-contrast roof/body for instant recognition from map view
  */
 export const LiveMap5dVehicleMarker: React.FC<LiveMap5dVehicleMarkerProps> = ({
   type,
-  size = 40,
+  size = 38,
   heading = 0,
   label,
   className = ""
 }) => {
-  const src = getVehicleImageSrc(type);
   const theme = getVehicleTheme(type);
+  const src = size <= 48 ? theme.lowPoly64 : theme.lowPolyPng;
 
   return (
     <div className={`relative flex flex-col items-center pointer-events-none select-none ${className}`}>
       
-      {/* 5D Vehicle body on road with heading */}
+      {/* Rotatable Vehicle on Road */}
       <div 
         className="relative transition-transform duration-300 ease-linear flex items-center justify-center"
         style={{
@@ -223,33 +261,33 @@ export const LiveMap5dVehicleMarker: React.FC<LiveMap5dVehicleMarkerProps> = ({
           transform: `rotate(${heading}deg)`
         }}
       >
-        {/* Directional Dual Headlight Projection Cones on the Road */}
+        {/* Dynamic Forward Headlight Projection Beam on Road */}
         <div 
-          className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-7 h-7 bg-amber-200/30 blur-[2.5px] rounded-full pointer-events-none"
+          className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-amber-200/35 blur-[2px] rounded-full pointer-events-none"
           style={{ clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }}
         />
 
-        {/* Ambient Chromatic Road Neon Underglow */}
+        {/* Ambient Road Underglow */}
         <div 
-          className="absolute inset-1 rounded-full blur-[3px] pointer-events-none opacity-45"
+          className="absolute inset-1 rounded-full blur-[2.5px] pointer-events-none opacity-40"
           style={{ backgroundColor: theme.glowColor }}
         />
 
-        {/* High-Fidelity 3D Vehicle */}
+        {/* Low-Poly Vehicle Cutout */}
         <img
           src={src}
-          alt={type}
-          className="w-full h-full object-contain filter drop-shadow-[0_5px_12px_rgba(0,0,0,0.7)]"
-          style={{ transform: 'scale(1.15)' }}
+          alt={theme.label}
+          className="w-full h-full object-contain filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.7)]"
+          style={{ transform: 'scale(1.1)' }}
         />
       </div>
 
-      {/* Realistic contact shadow beneath the vehicle wheels */}
+      {/* Dynamic contact shadow under wheels */}
       <div 
         className="w-6 h-1.5 bg-black/55 rounded-full blur-[1.5px] -mt-0.5 pointer-events-none" 
       />
 
-      {/* Optional Vehicle Name / Plate Label */}
+      {/* Optional Vehicle Plate / Name Label */}
       {label && (
         <span className="mt-0.5 px-1.5 py-0.2 rounded-md bg-slate-900/90 border border-slate-700/60 text-[8px] font-black text-slate-100 shadow-md whitespace-nowrap">
           {label}
@@ -286,7 +324,7 @@ export const Destination5dPin: React.FC<Destination5dPinProps> = ({
         </div>
       )}
 
-      {/* 5D Destination Pin with underglow */}
+      {/* Destination Pin */}
       <div className="relative flex flex-col items-center">
         <div className="absolute inset-0 bg-rose-500/30 blur-md rounded-full pointer-events-none" />
         <img

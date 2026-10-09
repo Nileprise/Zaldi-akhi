@@ -3,10 +3,12 @@ import {
   MapPin, X, ArrowUpDown, Clock, Phone, MessageSquare, 
   ShieldCheck, Star, CheckCircle, Check, ChevronRight, Wallet, 
   Settings, HelpCircle, Shield, LogOut, Tag, ArrowRight,
-  Share2, Users, Sparkles, Navigation, Calendar
+  Share2, Users, Sparkles, Navigation, Calendar, Box,
+  Package, User, Briefcase, Laptop, AlertTriangle, Scale,
+  Info, Plus, Minus, AlertCircle
 } from 'lucide-react';
 import { 
-  CustomerTab, BookingStatus, Driver, RideOrder, VehicleTier 
+  CustomerTab, BookingStatus, Driver, RideOrder, VehicleTier, ServiceMode 
 } from '../types';
 import { 
   VEHICLE_OPTIONS, MOCK_LOCATIONS, MOCK_CARPOOLS, 
@@ -25,6 +27,73 @@ import {
   reverseGeocodeRealWorldAddress 
 } from '../services/geocodingService';
 
+// Parcel Specifications across all vehicle tiers
+const VEHICLE_PARCEL_SPECS: Record<string, { maxWeight: number; types: { label: string; icon: string }[] }> = {
+  BIKE: {
+    maxWeight: 20,
+    types: [
+      { label: 'Documents & Envelopes', icon: '📄' },
+      { label: 'Food & Groceries', icon: '🍱' },
+      { label: 'Clothes & Small Box', icon: '👕' },
+      { label: 'Electronics & Gadgets', icon: '📱' },
+      { label: 'Medicines & Urgent Items', icon: '💊' },
+      { label: 'Small Box / Gift Parcel', icon: '📦' }
+    ]
+  },
+  AUTO: {
+    maxWeight: 100,
+    types: [
+      { label: 'Cartons & Medium Boxes', icon: '📦' },
+      { label: 'Home Appliances & TV', icon: '📺' },
+      { label: 'Catering & Bulk Food', icon: '🍲' },
+      { label: 'Retail & Commercial Stock', icon: '🛍️' },
+      { label: 'Tools & Hardware', icon: '🧰' },
+      { label: 'Bulk Freight (up to 100kg)', icon: '📦' }
+    ]
+  },
+  CAB: {
+    maxWeight: 200,
+    types: [
+      { label: 'Suitcases & Large Luggage', icon: '🧳' },
+      { label: 'Electronics & Monitors', icon: '💻' },
+      { label: 'Shopping Bags & Boxes', icon: '🛍️' },
+      { label: 'Office Supplies & Documents', icon: '📁' },
+      { label: 'Gift Crates & Fragile Goods', icon: '🎁' },
+      { label: 'Express Cab Freight (up to 200kg)', icon: '📦' }
+    ]
+  },
+  PREMIUM: {
+    maxWeight: 350,
+    types: [
+      { label: 'Heavy Luggage & Equipment', icon: '🧳' },
+      { label: 'Event Audio & Stage Props', icon: '🎙️' },
+      { label: 'Luxury Furniture & Home Decor', icon: '🛋️' },
+      { label: 'Large Cartons & Crates', icon: '📦' },
+      { label: 'Exhibition & Trade Stock', icon: '🏷️' },
+      { label: 'XL SUV Cargo (up to 350kg)', icon: '🚙' }
+    ]
+  },
+  TRUCK: {
+    maxWeight: 750,
+    types: [
+      { label: 'Commercial Cargo & Freight', icon: '🚛' },
+      { label: 'Pallets & Warehouse Stock', icon: '📦' },
+      { label: 'Home Furniture & Relocation', icon: '🛋️' },
+      { label: 'Industrial Hardware & Tools', icon: '⚙️' },
+      { label: 'Construction Materials', icon: '🧱' },
+      { label: 'Mini Truck Full Load (up to 750kg)', icon: '🚚' }
+    ]
+  }
+};
+
+const VEHICLE_MAX_SEATS: Record<string, { max: number; label: string }> = {
+  BIKE: { max: 1, label: '1 Rider allowed (Bike Solo)' },
+  AUTO: { max: 3, label: 'Max 3 Seats' },
+  CAB: { max: 4, label: 'Max 4 Seats' },
+  PREMIUM: { max: 6, label: 'Max 6 Seats' },
+  TRUCK: { max: 2, label: 'Max 2 Seats' }
+};
+
 interface CustomerAppProps {
   activeDriver: Driver;
   orders: RideOrder[];
@@ -40,7 +109,6 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 }) => {
   // Navigation & UI state
   const [customerTab, setCustomerTab] = useState<CustomerTab>('BOOKING');
-  const [showWelcome, setShowWelcome] = useState(true);
   const [isNightMode, setIsNightMode] = useState(false);
   const [activeInput, setActiveInput] = useState<'pickup' | 'drop' | null>(null);
   const [locationPinType, setLocationPinType] = useState<LocationPinType>('character_pin');
@@ -49,11 +117,46 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const [pickup, setPickup] = useState('');
   const [drop, setDrop] = useState('');
   const [distanceKm, setDistanceKm] = useState<number>(0);
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('BIKE');
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('AUTO');
   const [promoCode, setPromoCode] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'WALLET' | 'UPI' | 'CASH'>('WALLET');
+
+  // Service Mode for all vehicles ('PERSON' | 'PARCEL')
+  const [serviceModes, setServiceModes] = useState<Record<string, ServiceMode>>({
+    BIKE: 'PERSON',
+    AUTO: 'PERSON',
+    CAB: 'PERSON',
+    PREMIUM: 'PERSON',
+    TRUCK: 'PERSON'
+  });
+
+  // Parcel details per vehicle
+  const [parcelTypes, setParcelTypes] = useState<Record<string, string>>({
+    BIKE: 'Documents & Envelopes',
+    AUTO: 'Cartons & Medium Boxes',
+    CAB: 'Suitcases & Large Luggage',
+    PREMIUM: 'Heavy Luggage & Equipment',
+    TRUCK: 'Commercial Cargo & Freight'
+  });
+
+  const [parcelWeights, setParcelWeights] = useState<Record<string, number>>({
+    BIKE: 5,
+    AUTO: 25,
+    CAB: 40,
+    PREMIUM: 80,
+    TRUCK: 200
+  });
+
+  // Person Mode Passengers per vehicle (+ increases only one, - decreases only one)
+  const [passengersByVehicle, setPassengersByVehicle] = useState<Record<string, number>>({
+    BIKE: 1,
+    AUTO: 1,
+    CAB: 1,
+    PREMIUM: 1,
+    TRUCK: 1
+  });
 
   // Wallet Balance
   const [walletBalance, setWalletBalance] = useState(480);
@@ -137,12 +240,34 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   // Selected vehicle object
   const selectedVehicle = VEHICLE_OPTIONS.find(v => v.id === selectedVehicleId) || VEHICLE_OPTIONS[0];
 
+  // Active Service Mode for the selected vehicle ('PERSON' or 'PARCEL')
+  const currentMode: ServiceMode = useMemo(() => {
+    return serviceModes[selectedVehicleId] || 'PERSON';
+  }, [selectedVehicleId, serviceModes]);
+
+  // Active Tier Configuration based on selected vehicle and mode (in all bike, auto, cab, zaldi xl, mini truck)
+  const activeTierConfig = useMemo(() => {
+    const isParcel = currentMode === 'PARCEL';
+    const parcelSpec = VEHICLE_PARCEL_SPECS[selectedVehicleId] || VEHICLE_PARCEL_SPECS.BIKE;
+    return {
+      id: selectedVehicle.id,
+      name: isParcel ? `${selectedVehicle.name.split(' ')[0]} Parcel` : selectedVehicle.name,
+      capacity: isParcel ? `Max ${parcelSpec.maxWeight} kg` : selectedVehicle.capacity,
+      baseFare: 0,
+      perKm: 8.0,
+      etaMin: selectedVehicle.etaMin,
+      icon: isParcel ? '📦' : selectedVehicle.icon,
+      badge: selectedVehicle.badge,
+      description: selectedVehicle.description
+    };
+  }, [selectedVehicleId, currentMode, selectedVehicle]);
+
   // Specific Captain matching the chosen vehicle tier
   const currentDriver = useMemo<Driver>(() => {
     if (selectedVehicleId === 'BIKE') return INITIAL_DRIVERS[0]; // Ravi (Bike)
     if (selectedVehicleId === 'AUTO') return INITIAL_DRIVERS[1]; // Vikram (Auto)
     if (selectedVehicleId === 'CAB' || selectedVehicleId === 'PREMIUM') return INITIAL_DRIVERS[2]; // Priya (Cab)
-    if (selectedVehicleId === 'TRUCK' || selectedVehicleId === 'PARCEL') return INITIAL_DRIVERS[3]; // Suresh (Truck)
+    if (selectedVehicleId === 'TRUCK') return INITIAL_DRIVERS[3]; // Suresh (Truck)
     return activeDriver;
   }, [selectedVehicleId, activeDriver]);
 
@@ -152,26 +277,48 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     return generateActualRoadRoute(pickup, drop);
   }, [pickup, drop]);
 
-  // Sync road route distance
+  // Sync road route distance - strictly 0 if either pickup or drop is empty
   useEffect(() => {
-    if (roadRouteInfo) {
+    if (pickup && drop && roadRouteInfo) {
       setDistanceKm(roadRouteInfo.totalDistanceKm);
+    } else if (!pickup || !drop) {
+      setDistanceKm(0);
     }
-  }, [roadRouteInfo]);
+  }, [pickup, drop, roadRouteInfo]);
 
-  // Base fare calculation
-  const rawFare = distanceKm > 0 
-    ? Math.round(selectedVehicle.baseFare + distanceKm * selectedVehicle.perKm)
+  // Extra luggage fee is removed for bike and auto passenger trips
+  const extraLuggageFee = 0;
+
+  // Base trip fare: in ALL bike, auto, cab, zaldi xl, mini truck: distance × per km 8!
+  const baseTripFare = distanceKm > 0 
+    ? Math.round(distanceKm * 8)
     : 0;
-  const finalCalculatedFare = Math.max(rawFare - discountAmount, 10);
 
-  // Auto-dismiss welcome hero after 6 seconds (or manual click)
-  useEffect(() => {
-    if (showWelcome) {
-      const timer = setTimeout(() => setShowWelcome(false), 6000);
-      return () => clearTimeout(timer);
+  // Raw fare
+  const rawFare = baseTripFare;
+  const finalCalculatedFare = Math.max(rawFare - discountAmount, distanceKm > 0 ? 10 : 0);
+
+  // Active specs for current vehicle
+  const currentParcelSpec = VEHICLE_PARCEL_SPECS[selectedVehicleId] || VEHICLE_PARCEL_SPECS.BIKE;
+  const currentParcelWeight = parcelWeights[selectedVehicleId] || 1;
+  const currentParcelType = parcelTypes[selectedVehicleId] || currentParcelSpec.types[0].label;
+  const currentSeatSpec = VEHICLE_MAX_SEATS[selectedVehicleId] || VEHICLE_MAX_SEATS.BIKE;
+  const currentPassengers = passengersByVehicle[selectedVehicleId] || 1;
+
+  // Weight Limit Violations & Validation Checks for Parcels across all vehicles
+  const isWeightExceeded = useMemo(() => {
+    if (currentMode === 'PARCEL') {
+      return currentParcelWeight > currentParcelSpec.maxWeight;
     }
-  }, [showWelcome]);
+    return false;
+  }, [currentMode, currentParcelWeight, currentParcelSpec]);
+
+  const weightExceededMessage = useMemo(() => {
+    if (currentMode === 'PARCEL' && currentParcelWeight > currentParcelSpec.maxWeight) {
+      return `${selectedVehicle.name} cannot carry parcels above ${currentParcelSpec.maxWeight} kg (Current: ${currentParcelWeight} kg).`;
+    }
+    return null;
+  }, [currentMode, currentParcelWeight, currentParcelSpec, selectedVehicle]);
 
   // Autocomplete filtering
   useEffect(() => {
@@ -285,7 +432,10 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   };
 
   const recalcDistance = (p: string, d: string) => {
-    if (!p || !d) return;
+    if (!p || !d) {
+      setDistanceKm(0);
+      return;
+    }
     // Calculate deterministic realistic distance based on length
     const hash = (p.length * 3 + d.length * 7) % 18;
     const dist = Math.max(hash + 4, 3);
@@ -322,14 +472,19 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       fare: rawFare,
       discount: discountAmount,
       finalFare: finalCalculatedFare,
-      vehicleTier: selectedVehicle.name,
-      vehicleIcon: selectedVehicle.icon,
+      vehicleTier: `${activeTierConfig.name} • ${currentMode === 'PARCEL' ? 'Parcel' : 'Person'}`,
+      vehicleIcon: currentMode === 'PARCEL' ? '📦' : activeTierConfig.icon,
       driverId: currentDriver.id,
       riderPin: String(Math.floor(1000 + Math.random() * 9000)),
       status: 'FINDING_DRIVER',
       paymentMethod,
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      progressPercent: 0
+      progressPercent: 0,
+      serviceMode: currentMode,
+      parcelType: currentMode === 'PARCEL' ? currentParcelType : undefined,
+      parcelWeightKg: currentMode === 'PARCEL' ? currentParcelWeight : undefined,
+      luggageWeightKg: undefined,
+      extraLuggageFee: 0
     };
 
     onNewOrder(newRide);
@@ -352,34 +507,16 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       if (['TRIP_COMPLETED', 'COMPLETED'].includes(activeOrder.status)) return 'h-[540px]';
     }
     if (activeInput && suggestions.length > 0) return 'h-[75%]';
-    if (pickup && drop) return 'h-[58%]';
-    return 'h-[46%]';
+    if (pickup && drop) return 'h-[72%]';
+    return 'h-[52%]';
   };
 
   return (
-    <div className="flex justify-center items-center w-full py-2 sm:py-6">
+    <div className="flex justify-center items-center w-full py-2 sm:py-6 bg-white">
       
       {/* Phone Mockup Frame */}
-      <div className="relative w-full max-w-[420px] h-[870px] bg-slate-950 text-slate-100 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] rounded-[3rem] border-[10px] border-slate-900 flex flex-col font-sans overflow-hidden ring-1 ring-slate-800">
+      <div className="relative w-full max-w-[420px] h-[870px] bg-white text-slate-900 shadow-2xl rounded-[3rem] border-[10px] border-slate-100 flex flex-col font-sans overflow-hidden ring-1 ring-slate-200">
         
-        {/* Top Speaker / Dynamic Island & Status Bar */}
-        <div className="absolute top-0 w-full h-11 bg-transparent z-[110] flex justify-between items-center px-7 pointer-events-none">
-          <span className="text-[13px] font-black tracking-tight text-slate-800 dark:text-slate-200">9:41</span>
-          
-          {/* Dynamic Island pill */}
-          <div className="w-24 h-5 bg-black rounded-full flex items-center justify-center gap-1.5 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">GPS LIVE</span>
-          </div>
-
-          <div className="flex gap-1.5 items-center">
-            <div className="w-3.5 h-2.5 bg-slate-800 dark:bg-slate-200 rounded-sm"></div>
-            <div className="w-4 h-2.5 border border-slate-800 dark:border-slate-200 rounded-sm relative flex items-center p-0.5">
-              <div className="w-2.5 h-1.5 bg-emerald-500 rounded-xs"></div>
-            </div>
-          </div>
-        </div>
-
         {/* Map Background Area (Top 55-60%) */}
         <div className="absolute top-0 left-0 right-0 h-[62%] z-0 overflow-hidden">
           <InteractiveMap
@@ -387,8 +524,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             drop={drop}
             status={activeOrder?.status || 'IDLE'}
             progressPercent={activeOrder?.progressPercent || 0}
-            vehicleTierName={activeOrder?.vehicleTier || selectedVehicle.name}
-            vehicleIcon={activeOrder?.vehicleIcon || selectedVehicle.icon}
+            vehicleTierName={activeOrder?.vehicleTier || activeTierConfig.name}
+            vehicleIcon={activeOrder?.vehicleIcon || (currentMode === 'PARCEL' ? '📦' : activeTierConfig.icon)}
             driverName={currentDriver.name}
             driverPlate={currentDriver.plate}
             isNightMode={isNightMode}
@@ -404,72 +541,32 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
           />
 
           {/* Top Brand Header Bar over Map (Unobstructed, nothing hidden behind) */}
-          <div className="absolute top-12 left-0 right-0 px-5 flex justify-between items-center z-40 pointer-events-none">
-            <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl shadow-lg border border-slate-800 pointer-events-auto">
+          <div className="absolute top-4 left-0 right-0 px-5 flex justify-between items-center z-40 pointer-events-none">
+            <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-2xl shadow-md border border-slate-200 pointer-events-auto">
               <div className="w-6 h-6 rounded-lg bg-brand-blue flex items-center justify-center font-black text-white text-xs shadow-md">
                 Z
               </div>
-              <span className="text-sm font-black text-white tracking-tight">
-                Zaldi <span className="text-emerald-400 text-xs font-semibold">Fast</span>
+              <span className="text-sm font-black text-slate-900 tracking-tight">
+                Zaldi <span className="text-emerald-600 text-xs font-semibold">Fast</span>
               </span>
             </div>
 
             <div className="flex items-center gap-2 pointer-events-auto">
               <button 
                 onClick={() => setIsWalletOpen(true)}
-                className="flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-lg border border-slate-800 text-xs font-bold text-white hover:border-blue-500 transition"
+                className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-md border border-slate-200 text-xs font-bold text-slate-800 hover:border-blue-500 transition"
               >
-                <Wallet className="w-3.5 h-3.5 text-blue-400" />
+                <Wallet className="w-3.5 h-3.5 text-brand-blue" />
                 <span>₹{walletBalance}</span>
               </button>
 
               <button 
                 onClick={() => setShowSafety(true)}
                 title="Safety Shield"
-                className="p-2 bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-lg border border-slate-800 text-slate-300 hover:text-emerald-400 transition"
+                className="p-2 bg-white/95 backdrop-blur-md rounded-2xl shadow-md border border-slate-200 text-slate-700 hover:text-emerald-600 transition"
               >
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
               </button>
-            </div>
-          </div>
-
-          {/* Welcome Overlay (Click to dismiss or view again) */}
-          <div 
-            onClick={() => setShowWelcome(false)}
-            className={`absolute inset-0 z-50 transition-all duration-400 cursor-pointer overflow-hidden ${
-              showWelcome ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-            }`}
-          >
-            <div className={`w-full h-full p-6 pt-16 flex flex-col justify-between ${isNightMode ? 'hero-bg-dark' : 'hero-bg'} text-slate-900 dark:text-white`}>
-              <div className="flex items-center justify-between">
-                <span className="px-3 py-1 rounded-full bg-blue-600/10 text-brand-blue border border-blue-500/30 text-[10px] font-black uppercase tracking-wider">
-                  Zaldi Logistics
-                </span>
-                <span className="text-[11px] font-bold text-slate-400">Tap anywhere to book ✕</span>
-              </div>
-
-              <div className="my-auto py-4">
-                <h2 className="text-4xl font-black tracking-tight leading-none text-slate-900 dark:text-white">
-                  Move<br/>
-                  Anything<br/>
-                  <span className="text-brand-blue">Anywhere</span>
-                </h2>
-                <p className="mt-3 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 leading-relaxed max-w-[260px]">
-                  Bikes • Autos • Cabs • Parcels • Trucks. Superfast pickup in 3 minutes.
-                </p>
-                <div className="flex items-center gap-2 mt-4 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                  <span>14 Captains online near you</span>
-                </div>
-              </div>
-
-              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-3 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-lg">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Special: ₹50 OFF code ZALDI50</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
-              </div>
             </div>
           </div>
 
@@ -477,13 +574,13 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
         {/* Bottom Sheet Drawer */}
         <div 
-          className={`absolute w-full bg-white dark:bg-slate-900 rounded-t-3xl shadow-[0_-15px_40px_rgba(0,0,0,0.3)] transition-all duration-300 ease-in-out z-30 flex flex-col`}
+          className={`absolute w-full bg-white rounded-t-3xl shadow-[0_-15px_40px_rgba(0,0,0,0.1)] border-t border-slate-100 transition-all duration-300 ease-in-out z-30 flex flex-col`}
           style={{ height: getSheetHeight(), bottom: '70px' }}
         >
           {/* Pull Handle */}
-          <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mt-3 mb-2 flex-shrink-0 cursor-pointer"></div>
+          <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 mb-2 flex-shrink-0 cursor-pointer"></div>
 
-          <div className="flex-1 overflow-y-auto px-5 pb-6 no-scrollbar relative text-slate-900 dark:text-slate-100">
+          <div className="flex-1 overflow-y-auto px-5 pb-6 no-scrollbar relative text-slate-900">
             
             {/* =========================================
                 1. BOOKING TAB
@@ -518,9 +615,10 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                         <button
                           onClick={handleUseCurrentLocation}
                           title="Use Current Location (GPS)"
-                          className="p-1 rounded-lg text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition flex items-center gap-1 text-[10px] font-bold flex-shrink-0"
+                          className="px-2 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 transition flex items-center gap-1 text-[10px] font-black flex-shrink-0 cursor-pointer shadow-xs active:scale-95"
                         >
-                          <Navigation className="w-3.5 h-3.5" />
+                          <Navigation className="w-3.5 h-3.5 transform rotate-45 text-emerald-500" />
+                          <span>Current</span>
                         </button>
                         {pickup && (
                           <button onClick={() => setPickup('')} className="p-1 text-slate-400 hover:text-slate-600">
@@ -625,17 +723,28 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                     {/* Vehicle Tier Horizontal Carousel */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                        <span>Select Vehicle Tier</span>
-                        {distanceKm > 0 && <span>Est. Distance: {distanceKm} km</span>}
+                        <div className="flex items-center gap-2">
+                          <span>Select Vehicle Tier</span>
+                          <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-brand-blue dark:text-blue-400 text-[10px] font-black border border-blue-500/20">
+                            Instant Dispatch
+                          </span>
+                        </div>
+                        {Boolean(pickup && drop && distanceKm > 0) && (
+                          <span>Est. Distance: {distanceKm} km</span>
+                        )}
                       </div>
 
                       <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1.5 px-0.5">
                         {VEHICLE_OPTIONS.map((v) => {
                           const isSelected = selectedVehicleId === v.id;
-                          const theme = getVehicleTheme(v.id);
-                          const tierFare = distanceKm > 0 
-                            ? Math.round(v.baseFare + distanceKm * v.perKm)
-                            : v.baseFare;
+                          const vMode = serviceModes[v.id] || 'PERSON';
+
+                          // Per km rate: exact distance × per km 8 in ALL vehicles (bike, auto, cab, zaldi xl, mini truck)
+                          const effPerKm = 8;
+                          const hasRoute = Boolean(pickup && drop && distanceKm > 0);
+                          const tierFare = hasRoute 
+                            ? Math.round(distanceKm * effPerKm)
+                            : null;
 
                           return (
                             <div 
@@ -644,13 +753,14 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                                 setSelectedVehicleId(v.id);
                                 sounds.playPop();
                               }}
-                              className={`group flex-shrink-0 w-[112px] p-2.5 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-300 cursor-pointer relative overflow-hidden select-none ${
+                              className={`group flex-shrink-0 w-[112px] p-2.5 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-300 cursor-pointer relative overflow-hidden select-none bg-white ${
                                 isSelected 
-                                  ? 'border-brand-blue bg-gradient-to-b from-blue-500/10 to-blue-500/5 dark:from-blue-600/20 dark:to-slate-900/90 shadow-lg scale-[1.02]' 
-                                  : 'border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700 hover:scale-[1.01]'
+                                  ? 'border-brand-blue shadow-lg scale-[1.02] ring-2 ring-blue-500/20' 
+                                  : 'border-slate-200 hover:border-slate-300 hover:scale-[1.01]'
                               }`}
                               style={{
-                                boxShadow: isSelected ? theme.glowShadow : undefined
+                                backgroundColor: '#ffffff',
+                                boxShadow: isSelected ? '0 10px 25px -5px rgba(0, 102, 255, 0.2), 0 8px 10px -6px rgba(0, 102, 255, 0.1)' : undefined
                               }}
                             >
                               {/* 5D Holographic Badge */}
@@ -661,35 +771,283 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                               )}
                               
                               {/* 5D Vehicle Icon Container */}
-                              <div className="w-12 h-12 mb-1 flex items-center justify-center relative">
+                              <div className="w-12 h-12 mb-1 flex items-center justify-center relative bg-white rounded-xl">
                                 <Vehicle5dIcon 
                                   type={v.id} 
                                   size={44} 
                                   isSelected={isSelected}
+                                  showAura={false}
                                 />
                               </div>
 
-                              <span className="font-black text-xs text-slate-800 dark:text-slate-100 text-center leading-tight tracking-tight">
+                              <span className="font-black text-xs text-slate-800 text-center leading-tight tracking-tight">
                                 {v.name}
                               </span>
-                              <span className="text-[9px] text-slate-400 font-medium">
-                                {v.capacity}
+                              
+                              {/* Mode badge: Ride vs Transport for all vehicles */}
+                              <span className={`text-[9px] font-bold ${vMode === 'PARCEL' ? 'text-amber-600 dark:text-amber-400' : 'text-brand-blue'}`}>
+                                {vMode === 'PARCEL' ? '📦 Transport' : '👤 Ride'}
                               </span>
 
-                              <div className="flex flex-col items-center mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80 w-full">
-                                <span className="font-black text-xs text-slate-900 dark:text-white">
-                                  ₹{tierFare}
-                                </span>
-                                <span className="text-[9px] font-bold text-emerald-500 dark:text-emerald-400 flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  <span>{v.etaMin} min</span>
-                                </span>
+                              {/* Price rate display: empty without price when pickup/drop not entered; NO time like 6 mins below rate */}
+                              <div className="flex flex-col items-center mt-1.5 pt-1.5 border-t border-slate-100 w-full min-h-[20px] justify-center">
+                                {hasRoute && tierFare !== null ? (
+                                  <span className="font-black text-xs text-slate-900">
+                                    ₹{tierFare}
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                           );
                         })}
                       </div>
                     </div>
+
+                    {/* ====================================================
+                        SERVICE MODE CONTROLS (RIDE vs TRANSPORT FOR ALL VEHICLES: BIKE, AUTO, CAB, ZALDI XL, MINI TRUCK)
+                       ==================================================== */}
+                    <div className="space-y-3 p-3.5 bg-slate-50/90 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xs animate-in fade-in">
+                      
+                      {/* 1. Ride (Person) vs Transport (Parcel) Segmented Pill */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                          <span>Service for {selectedVehicle.name}:</span>
+                        </span>
+
+                        <div className="bg-slate-200/80 dark:bg-slate-900 p-0.5 rounded-xl flex items-center gap-1 border border-slate-300/60 dark:border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playPop();
+                              setServiceModes(prev => ({ ...prev, [selectedVehicleId]: 'PERSON' }));
+                            }}
+                            className={`py-1.5 px-3 rounded-lg text-xs font-black flex items-center gap-1.5 transition ${
+                              currentMode === 'PERSON'
+                                ? 'bg-blue-600 text-white shadow-md'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                          >
+                            <User className="w-3.5 h-3.5" />
+                            <span>Ride</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playPop();
+                              setServiceModes(prev => ({ ...prev, [selectedVehicleId]: 'PARCEL' }));
+                            }}
+                            className={`py-1.5 px-3 rounded-lg text-xs font-black flex items-center gap-1.5 transition ${
+                              currentMode === 'PARCEL'
+                                ? 'bg-amber-500 text-white shadow-md'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                          >
+                            <Package className="w-3.5 h-3.5" />
+                            <span>Transport</span>
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 font-bold">
+                              Max {currentParcelSpec.maxWeight}kg
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Ride (Person) Mode Passenger Controls: + increase only one, - decrease only one */}
+                      {currentMode === 'PERSON' && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/80 dark:border-slate-700/60 bg-white dark:bg-slate-900/90 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-brand-blue" />
+                            <div>
+                              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                                {selectedVehicleId === 'BIKE' ? 'Passenger (Bike Solo)' : 'Passengers'}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {currentSeatSpec.label}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sounds.playPop();
+                                setPassengersByVehicle(prev => ({
+                                  ...prev,
+                                  [selectedVehicleId]: Math.max(1, (prev[selectedVehicleId] || 1) - 1)
+                                }));
+                              }}
+                              disabled={currentPassengers <= 1}
+                              className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-slate-700 dark:text-slate-300 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition"
+                              title="Decrease only one passenger (-1)"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-xs font-black min-w-[20px] text-center text-slate-900 dark:text-white">
+                              {currentPassengers}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sounds.playPop();
+                                setPassengersByVehicle(prev => ({
+                                  ...prev,
+                                  [selectedVehicleId]: Math.min(currentSeatSpec.max, (prev[selectedVehicleId] || 1) + 1)
+                                }));
+                              }}
+                              disabled={currentPassengers >= currentSeatSpec.max}
+                              className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-slate-700 dark:text-slate-300 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition"
+                              title="Increase only one passenger (+1)"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Transport (Parcel) Service Options for all vehicles */}
+                      {currentMode === 'PARCEL' && (
+                        <div className="space-y-3 pt-1 border-t border-slate-200/80 dark:border-slate-700/60">
+                          {/* Type of Parcel / Cargo selector */}
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                              <span className="flex items-center gap-1">
+                                <Package className="w-3.5 h-3.5 text-amber-500" />
+                                <span>Type of Cargo / Parcel:</span>
+                              </span>
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-black">
+                                {currentParcelType}
+                              </span>
+                            </div>
+
+                            {/* Parcel Type Chips */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                              {currentParcelSpec.types.map((pt) => {
+                                const isSelectedType = currentParcelType === pt.label;
+                                return (
+                                  <button
+                                    key={pt.label}
+                                    type="button"
+                                    onClick={() => {
+                                      sounds.playPop();
+                                      setParcelTypes(prev => ({ ...prev, [selectedVehicleId]: pt.label }));
+                                    }}
+                                    className={`p-2 rounded-xl text-left border flex items-center gap-2 transition ${
+                                      isSelectedType
+                                        ? 'bg-amber-500/15 border-amber-500 text-amber-600 dark:text-amber-400 font-bold shadow-xs'
+                                        : 'bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700/70 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    <span className="text-sm">{pt.icon}</span>
+                                    <span className="text-[10px] leading-tight font-medium truncate">
+                                      {pt.label}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Weight Selector & Limit Validation */}
+                          <div className="space-y-2 bg-white dark:bg-slate-900/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-white">
+                                <Scale className="w-3.5 h-3.5 text-amber-500" />
+                                <span>Weight:</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-base font-black text-slate-900 dark:text-white">
+                                  {currentParcelWeight} kg
+                                </span>
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                  currentParcelWeight > currentParcelSpec.maxWeight
+                                    ? 'bg-rose-500/20 text-rose-500 border border-rose-500/40 animate-pulse'
+                                    : 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/40'
+                                }`}>
+                                  Limit: Max {currentParcelSpec.maxWeight} kg
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Stepper (+ increase only one, - decrease only one) */}
+                            <div className="flex items-center gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  sounds.playPop();
+                                  setParcelWeights(prev => ({
+                                    ...prev,
+                                    [selectedVehicleId]: Math.max(1, (prev[selectedVehicleId] || 1) - 1)
+                                  }));
+                                }}
+                                disabled={currentParcelWeight <= 1}
+                                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-slate-700 dark:text-slate-300 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition"
+                                title="Decrease only one kg (-1)"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+
+                              <input 
+                                type="range"
+                                min={1}
+                                max={currentParcelSpec.maxWeight}
+                                step={1}
+                                value={currentParcelWeight}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setParcelWeights(prev => ({
+                                    ...prev,
+                                    [selectedVehicleId]: Math.min(currentParcelSpec.maxWeight, Math.max(1, val))
+                                  }));
+                                }}
+                                className="flex-1 accent-amber-500 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  sounds.playPop();
+                                  setParcelWeights(prev => ({
+                                    ...prev,
+                                    [selectedVehicleId]: Math.min(currentParcelSpec.maxWeight, (prev[selectedVehicleId] || 1) + 1)
+                                  }));
+                                }}
+                                disabled={currentParcelWeight >= currentParcelSpec.maxWeight}
+                                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-slate-700 dark:text-slate-300 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition"
+                                title="Increase only one kg (+1)"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Person mode has no baggage policy or luggage fee */}
+                    </div>
+
+                    {/* Fare Summary Breakdown Pill */}
+                    {pickup && drop && (
+                      <div className="bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/80 text-xs space-y-1">
+                        {currentMode === 'PARCEL' && (
+                          <div className="flex justify-between text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                            <span>Transport ({selectedVehicle.name}): {currentParcelType}:</span>
+                            <span>{currentParcelWeight} kg included</span>
+                          </div>
+                        )}
+                        {discountAmount > 0 && (
+                          <div className="flex justify-between font-bold text-emerald-600 dark:text-emerald-400">
+                            <span>Coupon Discount:</span>
+                            <span>-₹{discountAmount}</span>
+                          </div>
+                        )}
+                        <div className={`flex justify-between font-black text-sm text-slate-900 dark:text-white ${
+                          (currentMode === 'PARCEL' || discountAmount > 0) ? 'pt-1 border-t border-slate-200 dark:border-slate-700' : ''
+                        }`}>
+                          <span>Total Amount to Pay:</span>
+                          <span className="text-emerald-600 dark:text-emerald-400">₹{finalCalculatedFare}</span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Promo Code & Payment Summary */}
                     {pickup && drop && (
@@ -744,17 +1102,27 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                     {/* Book Now Button */}
                     <button 
                       onClick={handleConfirmBooking}
-                      disabled={!pickup || !drop}
+                      disabled={!pickup || !drop || isWeightExceeded}
                       className={`w-full py-3.5 rounded-2xl font-black text-sm shadow-xl flex justify-center items-center gap-2 transition-all mt-2 active:scale-98 ${
-                        pickup && drop 
-                          ? 'bg-brand-blue text-white shadow-blue-600/30 hover:bg-blue-600'
-                          : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none'
+                        !pickup || !drop
+                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none'
+                          : isWeightExceeded
+                          ? 'bg-rose-500/20 text-rose-500 border border-rose-500/40 cursor-not-allowed shadow-none'
+                          : currentMode === 'PARCEL'
+                          ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30'
+                          : 'bg-brand-blue text-white shadow-blue-600/30 hover:bg-blue-600'
                       }`}
                     >
                       <span>
-                        {pickup && drop ? `Confirm ${selectedVehicle.name} • ₹${finalCalculatedFare}` : 'Enter Pickup & Drop'}
+                        {!pickup || !drop 
+                          ? 'Enter Pickup & Drop' 
+                          : isWeightExceeded 
+                          ? `Weight Exceeded (${weightExceededMessage})`
+                          : currentMode === 'PARCEL'
+                          ? `Confirm ${activeTierConfig.name} Delivery • ₹${finalCalculatedFare}`
+                          : `Confirm ${activeTierConfig.name} Ride • ₹${finalCalculatedFare}`}
                       </span>
-                      {pickup && drop && <ArrowRight className="w-4 h-4" />}
+                      {pickup && drop && !isWeightExceeded && <ArrowRight className="w-4 h-4" />}
                     </button>
 
                   </div>
@@ -764,7 +1132,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                 {activeOrder && (activeOrder.status === 'FINDING_DRIVER' || activeOrder.status === 'SEARCHING') && (
                   <div className="flex flex-col items-center justify-center py-5 text-center space-y-4 animate-in fade-in">
                     <div className="relative flex items-center justify-center w-20 h-20">
-                      <div className="w-16 h-16 rounded-2xl bg-brand-blue/10 border-2 border-brand-blue flex items-center justify-center shadow-lg">
+                      <div className="w-16 h-16 rounded-2xl bg-white border-2 border-brand-blue flex items-center justify-center shadow-lg">
                         <Vehicle3dIcon type={activeOrder.vehicleTier} size={46} className="filter drop-shadow-md" />
                       </div>
                     </div>
@@ -781,6 +1149,12 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                         <span>Destination:</span>
                         <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[170px]">{activeOrder.drop}</span>
                       </div>
+                      {activeOrder.serviceMode === 'PARCEL' && (
+                        <div className="flex justify-between font-medium text-amber-600 dark:text-amber-400">
+                          <span>Transport Item:</span>
+                          <span className="font-bold truncate max-w-[170px]">{activeOrder.parcelType} ({activeOrder.parcelWeightKg} kg)</span>
+                        </div>
+                      )}
                       <div className="flex justify-between font-medium text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-700">
                         <span>Estimated Fare:</span>
                         <span className="font-black text-emerald-500 text-sm">₹{activeOrder.finalFare}</span>
@@ -854,7 +1228,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
                     {/* Driver Card */}
                     <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                      <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm">
                         <Vehicle3dIcon type={activeOrder.vehicleTier || selectedVehicle.name} size={38} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -931,7 +1305,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
                     {/* Driver Card */}
                     <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                      <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm">
                         <Vehicle3dIcon type={activeOrder.vehicleTier || selectedVehicle.name} size={38} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -982,7 +1356,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
                     {/* Driver Card */}
                     <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                      <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm">
                         <Vehicle3dIcon type={activeOrder.vehicleTier || selectedVehicle.name} size={38} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1068,6 +1442,11 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                       <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                         Paid via {activeOrder.paymentMethod} • Ref {activeOrder.id}
                       </div>
+                      {activeOrder.serviceMode === 'PARCEL' && (
+                        <div className="text-[10px] text-amber-600 dark:text-amber-400 font-bold pt-0.5">
+                          📦 {activeOrder.parcelType} ({activeOrder.parcelWeightKg} kg)
+                        </div>
+                      )}
                     </div>
 
                     {/* Tip Driver Chips */}
@@ -1442,7 +1821,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
         </div>
 
         {/* Bottom Navigation Bar */}
-        <div className="absolute bottom-0 w-full h-[70px] bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center px-4 z-40">
+        <div className="absolute bottom-0 w-full h-[70px] bg-white border-t border-slate-200 flex justify-between items-center px-4 z-40">
           <button 
             onClick={() => {
               setCustomerTab('BOOKING');

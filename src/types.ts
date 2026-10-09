@@ -66,6 +66,8 @@ export interface Driver {
   earningsToday: number;
 }
 
+export type ServiceMode = 'PERSON' | 'PARCEL';
+
 export interface RideOrder {
   id: string;
   customerName: string;
@@ -84,6 +86,11 @@ export interface RideOrder {
   paymentMethod: 'WALLET' | 'UPI' | 'CASH' | 'CARD';
   createdAt: string;
   progressPercent: number;
+  serviceMode?: ServiceMode;
+  parcelType?: string;
+  parcelWeightKg?: number;
+  luggageWeightKg?: number;
+  extraLuggageFee?: number;
 }
 
 export interface LocationItem {

@@ -1,0 +1,38 @@
+<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Front Steering Wheel -->
+  <polygon points="375,370 420,335 430,280 400,245 355,275 345,330" fill="#0f172a" />
+  <polygon points="375,370 345,330 355,275 385,305" fill="#1e293b" />
+  <polygon points="380,340 405,320 410,290 395,270 375,295" fill="#6366f1" />
+
+  <!-- Dual Rear Wheels (Axle 1 & 2) -->
+  <polygon points="190,385 235,350 245,295 215,260 170,290 160,345" fill="#0f172a" />
+  <polygon points="190,385 160,345 170,290 200,320" fill="#1e293b" />
+  <polygon points="195,355 220,335 225,305 210,285 190,310" fill="#6366f1" />
+
+  <polygon points="110,395 155,360 165,305 135,270 90,300 80,355" fill="#0f172a" />
+  <polygon points="110,395 80,355 90,300 120,330" fill="#1e293b" />
+  <polygon points="115,365 140,345 145,315 130,295 110,320" fill="#6366f1" />
+
+  <!-- Chassis Frame Rail -->
+  <polygon points="70,350 250,360 360,340 370,310 80,315" fill="#0f172a" />
+
+  <!-- Front Cab-Over Cabin (Deep Indigo) -->
+  <polygon points="330,340 445,320 455,235 340,245" fill="#312e81" />
+  <polygon points="445,320 465,300 460,215 455,235" fill="#1e1b4b" />
+  <!-- Cab Windshield & Windows -->
+  <polygon points="350,240 445,230 425,175 355,185" fill="#38bdf8" fill-opacity="0.9" />
+  <polygon points="445,230 458,215 438,165 425,175" fill="#93c5fd" fill-opacity="0.85" />
+  <polygon points="355,185 425,175 410,160 350,170" fill="#4338ca" />
+
+  <!-- HIGH-CONTRAST RECTANGULAR CARGO FREIGHT BOX (Bright White & Silver) -->
+  <!-- Cargo Box Flank (Bright Pearl White) -->
+  <polygon points="85,315 330,305 325,145 80,165" fill="#f8fafc" />
+  <polygon points="85,315 80,165 65,180 70,330" fill="#cbd5e1" />
+  <!-- Cargo Box Top Surface (Pure Clean White) -->
+  <polygon points="80,165 325,145 275,115 50,135" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" />
+
+  <!-- BOLD ZALDI 'Z' GRAPHIC ACROSS CARGO BOX (Golden Amber on White Box) -->
+  <polygon points="135,270 275,250 255,265 175,275" fill="#facc15" />
+  <polygon points="255,265 175,275 235,185 155,195" fill="#eab308" />
+  <polygon points="235,185 155,195 285,175 205,185" fill="#facc15" />
+</svg>

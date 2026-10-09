@@ -1,176 +1,169 @@
 import React from 'react';
+import bikeImg from '../assets/images/zaldi_bike_lowpoly_64.png';
+import autoImg from '../assets/images/zaldi_auto_lowpoly_64.png';
+import sedanImg from '../assets/images/zaldi_sedan_lowpoly_64.png';
+import suvImg from '../assets/images/zaldi_suv_lowpoly_64.png';
+import truckImg from '../assets/images/zaldi_truck_lowpoly_64.png';
+import parcelImg from '../assets/images/zaldi_parcel_lowpoly_64.png';
 
 interface VehicleMarkerProps {
   bearing?: number;
-  type?: 'BIKE' | 'AUTO' | 'CAB' | 'TRUCK' | string;
+  type?: 'BIKE' | 'AUTO' | 'CAB' | 'SUV' | 'TRUCK' | 'PARCEL' | string;
+  size?: number;
   isOnline?: boolean;
 }
 
 /**
- * Small, clean 3D/modern vehicle markers for ride-hailing maps.
- * Compact (24-28px), accurately oriented to road heading,
- * with contact shadow, directional light cone, and clean vector details.
+ * Low-Poly Vehicle Marker Base Component
+ * - Strong silhouette readable at 32–64 px
+ * - Minimal tiny details
+ * - High-contrast roof/body
+ * - Zaldi Z visible without overwhelming
+ * - Transparent background (NO baked ground/shadow)
+ * - Rotation-ready for real-time map movement
  */
-
-// 1. 🏍️ 3D Modern Motorbike Marker
-export const ModernBikeMarker: React.FC<{ bearing?: number }> = ({ bearing = 0 }) => (
+const LowPolyMarkerWrapper: React.FC<{
+  bearing?: number;
+  src: string;
+  alt: string;
+  size?: number;
+  lightBeamColor?: string;
+  glowColor?: string;
+}> = ({ 
+  bearing = 0, 
+  src, 
+  alt, 
+  size = 36, 
+  lightBeamColor = 'rgba(254, 240, 138, 0.4)',
+  glowColor = 'rgba(245, 158, 11, 0.35)'
+}) => (
   <div 
     className="relative flex items-center justify-center pointer-events-none select-none transition-transform duration-200"
     style={{ transform: `rotate(${bearing}deg)` }}
   >
-    {/* Soft directional headlight beam */}
-    <div className="absolute -top-3.5 w-4 h-6 bg-gradient-to-t from-sky-400/40 to-transparent blur-[2px] rounded-full pointer-events-none" />
+    {/* Unbaked Directional Headlight Beam on Road */}
+    <div 
+      className="absolute -top-3 left-1/2 -translate-x-1/2 w-5 h-6 blur-[2px] rounded-full pointer-events-none"
+      style={{ 
+        background: `radial-gradient(ellipse at bottom, ${lightBeamColor} 0%, transparent 70%)`,
+        clipPath: 'polygon(50% 100%, 0 0, 100% 0)' 
+      }} 
+    />
     
-    {/* Contact ground shadow */}
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-7 bg-black/50 rounded-full blur-[2px]" />
+    {/* Unbaked Ground Contact Occlusion Shadow */}
+    <div 
+      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/60 rounded-full blur-[2px] pointer-events-none"
+      style={{ width: size * 0.75, height: size * 0.3 }}
+    />
 
-    {/* Vector Modern 3D Bike */}
-    <svg width="24" height="28" viewBox="0 0 24 28" fill="none" className="relative z-10 drop-shadow-[0_2px_5px_rgba(0,0,0,0.6)]">
-      {/* Front tire */}
-      <rect x="10.5" y="1" width="3" height="6" rx="1.5" fill="#0f172a" stroke="#475569" strokeWidth="0.6" />
-      {/* Front fork & handlebars */}
-      <path d="M 6.5 8 L 17.5 8" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="6.5" cy="8" r="1.2" fill="#38bdf8" />
-      <circle cx="17.5" cy="8" r="1.2" fill="#38bdf8" />
-      {/* Bike Chassis / Fuel tank (vibrant blue) */}
-      <path d="M 9.5 8 L 14.5 8 L 14 15 L 10 15 Z" fill="#0284c7" />
-      {/* Rider Helmet (top-down 3D sphere) */}
-      <ellipse cx="12" cy="12" rx="3.5" ry="4" fill="#0f172a" stroke="#38bdf8" strokeWidth="1" />
-      <ellipse cx="12" cy="10.5" rx="2.5" ry="1.2" fill="#38bdf8" opacity="0.9" />
-      <circle cx="10.5" cy="11.5" r="0.8" fill="#ffffff" opacity="0.6" />
-      {/* Rider jacket / shoulders */}
-      <path d="M 6.5 14 Q 12 16.5 17.5 14 L 16 19 Q 12 20 8 19 Z" fill="#1e293b" opacity="0.95" />
-      {/* Rear seat */}
-      <rect x="10" y="18" width="4" height="5" rx="1" fill="#334155" />
-      {/* Rear red tail light */}
-      <rect x="10.5" y="23" width="3" height="1.5" rx="0.5" fill="#ef4444" />
-      {/* Rear tire */}
-      <rect x="10.5" y="22" width="3" height="5" rx="1.5" fill="#0f172a" />
-    </svg>
+    {/* Low-Poly Cutout (Zero shadow baked in) */}
+    <div 
+      className="relative z-10 flex items-center justify-center filter drop-shadow-[0_2px_5px_rgba(0,0,0,0.6)]"
+      style={{ width: size, height: size }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="w-full h-full object-contain pointer-events-none"
+        style={{ transform: 'scale(1.1)' }}
+      />
+    </div>
   </div>
 );
 
-// 2. 🛺 Modern Auto 3W Marker
-export const ModernAutoMarker: React.FC<{ bearing?: number }> = ({ bearing = 0 }) => (
-  <div 
-    className="relative flex items-center justify-center pointer-events-none select-none transition-transform duration-200"
-    style={{ transform: `rotate(${bearing}deg)` }}
-  >
-    {/* Headlight beam */}
-    <div className="absolute -top-3.5 w-4 h-6 bg-gradient-to-t from-amber-300/35 to-transparent blur-[2px] rounded-full pointer-events-none" />
-    
-    {/* Shadow */}
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-7 bg-black/50 rounded-full blur-[2px]" />
-
-    <svg width="24" height="28" viewBox="0 0 24 28" fill="none" className="relative z-10 drop-shadow-[0_2px_5px_rgba(0,0,0,0.6)]">
-      {/* Front single wheel */}
-      <rect x="10.5" y="1.5" width="3" height="5" rx="1.2" fill="#0f172a" />
-      {/* Front yellow hood */}
-      <path d="M 12 1.5 L 16 7 L 8 7 Z" fill="#eab308" />
-      <circle cx="12" cy="1.5" r="1.2" fill="#fef08a" />
-      {/* Windshield */}
-      <rect x="7" y="7" width="10" height="3" rx="1" fill="#38bdf8" opacity="0.85" />
-      {/* Yellow classic roof */}
-      <rect x="6" y="10" width="12" height="13" rx="2" fill="#eab308" stroke="#ca8a04" strokeWidth="0.8" />
-      {/* Green body stripe */}
-      <rect x="6" y="13.5" width="12" height="6.5" fill="#15803d" />
-      {/* Rear dual wheels */}
-      <rect x="4" y="17" width="2" height="5.5" rx="1" fill="#0f172a" />
-      <rect x="18" y="17" width="2" height="5.5" rx="1" fill="#0f172a" />
-      {/* Rear bumper & red lights */}
-      <rect x="6.5" y="23" width="11" height="2" rx="0.5" fill="#1e293b" />
-      <circle cx="8" cy="24" r="0.8" fill="#ef4444" />
-      <circle cx="16" cy="24" r="0.8" fill="#ef4444" />
-    </svg>
-  </div>
+// 1. 🏍️ Low-Poly Bike Marker (Zaldi Moto)
+export const ModernBikeMarker: React.FC<{ bearing?: number; size?: number }> = ({ bearing = 0, size = 34 }) => (
+  <LowPolyMarkerWrapper
+    bearing={bearing}
+    size={size}
+    src={bikeImg}
+    alt="Zaldi Moto EV"
+    lightBeamColor="rgba(56, 189, 248, 0.45)"
+    glowColor="rgba(6, 182, 212, 0.4)"
+  />
 );
 
-// 3. 🚕 Modern Cab Sedan Marker
-export const ModernCabMarker: React.FC<{ bearing?: number }> = ({ bearing = 0 }) => (
-  <div 
-    className="relative flex items-center justify-center pointer-events-none select-none transition-transform duration-200"
-    style={{ transform: `rotate(${bearing}deg)` }}
-  >
-    {/* Dual headlights beam */}
-    <div className="absolute -top-3.5 w-5 h-6 bg-gradient-to-t from-yellow-300/35 to-transparent blur-[2px] rounded-full pointer-events-none" />
-    
-    {/* Shadow */}
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-8 bg-black/50 rounded-full blur-[2px]" />
-
-    <svg width="24" height="30" viewBox="0 0 24 30" fill="none" className="relative z-10 drop-shadow-[0_2px_5px_rgba(0,0,0,0.6)]">
-      {/* Sedan chassis */}
-      <rect x="5.5" y="3" width="13" height="24" rx="3.5" fill="#f8fafc" stroke="#94a3b8" strokeWidth="0.8" />
-      {/* Front hood headlights */}
-      <circle cx="7.5" cy="4" r="1.2" fill="#fef08a" />
-      <circle cx="16.5" cy="4" r="1.2" fill="#fef08a" />
-      {/* Front Windshield */}
-      <path d="M 7 9 L 17 9 L 16 12 L 8 12 Z" fill="#38bdf8" opacity="0.85" />
-      {/* Black/Yellow Roof with Taxi Beacon */}
-      <rect x="7.5" y="12" width="9" height="7" rx="1.5" fill="#0f172a" />
-      <rect x="9.5" y="14" width="5" height="2.5" rx="0.5" fill="#eab308" stroke="#ffffff" strokeWidth="0.4" />
-      {/* Rear Windshield */}
-      <path d="M 8 19 L 16 19 L 17 22 L 7 22 Z" fill="#38bdf8" opacity="0.85" />
-      {/* Dual Red Tail lights */}
-      <rect x="6.5" y="26" width="2.5" height="1.2" rx="0.4" fill="#ef4444" />
-      <rect x="15" y="26" width="2.5" height="1.2" rx="0.4" fill="#ef4444" />
-      {/* 4 Wheels */}
-      <rect x="4" y="6" width="1.8" height="4.5" rx="0.8" fill="#0f172a" />
-      <rect x="18.2" y="6" width="1.8" height="4.5" rx="0.8" fill="#0f172a" />
-      <rect x="4" y="19" width="1.8" height="4.5" rx="0.8" fill="#0f172a" />
-      <rect x="18.2" y="19" width="1.8" height="4.5" rx="0.8" fill="#0f172a" />
-    </svg>
-  </div>
+// 2. 🛺 Low-Poly Auto Rickshaw Marker (Zaldi TukTuk)
+export const ModernAutoMarker: React.FC<{ bearing?: number; size?: number }> = ({ bearing = 0, size = 36 }) => (
+  <LowPolyMarkerWrapper
+    bearing={bearing}
+    size={size}
+    src={autoImg}
+    alt="Zaldi TukTuk 3W"
+    lightBeamColor="rgba(253, 224, 71, 0.5)"
+    glowColor="rgba(245, 158, 11, 0.45)"
+  />
 );
 
-// 4. 🚚 Modern Mini Truck Marker
-export const ModernTruckMarker: React.FC<{ bearing?: number }> = ({ bearing = 0 }) => (
-  <div 
-    className="relative flex items-center justify-center pointer-events-none select-none transition-transform duration-200"
-    style={{ transform: `rotate(${bearing}deg)` }}
-  >
-    {/* Headlights beam */}
-    <div className="absolute -top-3.5 w-5 h-6 bg-gradient-to-t from-sky-300/35 to-transparent blur-[2px] rounded-full pointer-events-none" />
-    
-    {/* Shadow */}
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-9 bg-black/50 rounded-full blur-[2px]" />
+// 3. 🚕 Low-Poly City Sedan Marker (Zaldi Go)
+export const ModernCabMarker: React.FC<{ bearing?: number; size?: number }> = ({ bearing = 0, size = 38 }) => (
+  <LowPolyMarkerWrapper
+    bearing={bearing}
+    size={size}
+    src={sedanImg}
+    alt="Zaldi Go Sedan"
+    lightBeamColor="rgba(254, 240, 138, 0.5)"
+    glowColor="rgba(59, 130, 246, 0.4)"
+  />
+);
 
-    <svg width="26" height="32" viewBox="0 0 26 32" fill="none" className="relative z-10 drop-shadow-[0_2px_5px_rgba(0,0,0,0.6)]">
-      {/* Truck Cabin */}
-      <rect x="6" y="2" width="14" height="9" rx="2" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="0.8" />
-      {/* Windshield */}
-      <rect x="7.5" y="4" width="11" height="4" rx="1" fill="#38bdf8" opacity="0.85" />
-      {/* Cargo Bed (Blue/Steel) */}
-      <rect x="5.5" y="11" width="15" height="17" rx="1.5" fill="#1e3a8a" stroke="#1d4ed8" strokeWidth="0.8" />
-      {/* Cargo payload ribs */}
-      <line x1="8" y1="14" x2="18" y2="14" stroke="#3b82f6" strokeWidth="1" />
-      <line x1="8" y1="18" x2="18" y2="18" stroke="#3b82f6" strokeWidth="1" />
-      <line x1="8" y1="22" x2="18" y2="22" stroke="#3b82f6" strokeWidth="1" />
-      {/* Tail lights */}
-      <rect x="6.5" y="27.5" width="2.5" height="1" fill="#ef4444" />
-      <rect x="17" y="27.5" width="2.5" height="1" fill="#ef4444" />
-      {/* 4 Heavy Duty Wheels */}
-      <rect x="4" y="4" width="2.2" height="5" rx="1" fill="#0f172a" />
-      <rect x="19.8" y="4" width="2.2" height="5" rx="1" fill="#0f172a" />
-      <rect x="4" y="20" width="2.2" height="6" rx="1" fill="#0f172a" />
-      <rect x="19.8" y="20" width="2.2" height="6" rx="1" fill="#0f172a" />
-    </svg>
-  </div>
+// 4. 🚙 Low-Poly Rugged SUV Marker (Zaldi Prime SUV)
+export const ModernSuvMarker: React.FC<{ bearing?: number; size?: number }> = ({ bearing = 0, size = 40 }) => (
+  <LowPolyMarkerWrapper
+    bearing={bearing}
+    size={size}
+    src={suvImg}
+    alt="Zaldi Prime SUV"
+    lightBeamColor="rgba(192, 132, 252, 0.45)"
+    glowColor="rgba(168, 85, 247, 0.45)"
+  />
+);
+
+// 5. 🚚 Low-Poly Cargo Mini-Truck Marker (Zaldi Haul)
+export const ModernTruckMarker: React.FC<{ bearing?: number; size?: number }> = ({ bearing = 0, size = 42 }) => (
+  <LowPolyMarkerWrapper
+    bearing={bearing}
+    size={size}
+    src={truckImg}
+    alt="Zaldi Haul Mini-Truck"
+    lightBeamColor="rgba(99, 102, 241, 0.45)"
+    glowColor="rgba(79, 70, 229, 0.4)"
+  />
+);
+
+// 6. 📦 Low-Poly Courier Parcel Marker (Zaldi Express)
+export const ModernParcelMarker: React.FC<{ bearing?: number; size?: number }> = ({ bearing = 0, size = 34 }) => (
+  <LowPolyMarkerWrapper
+    bearing={bearing}
+    size={size}
+    src={parcelImg}
+    alt="Zaldi Express Courier"
+    lightBeamColor="rgba(52, 211, 153, 0.45)"
+    glowColor="rgba(16, 185, 129, 0.4)"
+  />
 );
 
 // Generic Unified Vehicle Marker Switcher
 export const ModernVehicleMarker: React.FC<VehicleMarkerProps> = ({ 
   bearing = 0, 
-  type = 'BIKE' 
+  type = 'CAB',
+  size = 38
 }) => {
   const norm = String(type).toUpperCase();
   if (norm.includes('BIKE') || norm.includes('MOTO') || norm.includes('🏍')) {
-    return <ModernBikeMarker bearing={bearing} />;
+    return <ModernBikeMarker bearing={bearing} size={size} />;
   }
   if (norm.includes('AUTO') || norm.includes('3W') || norm.includes('🛺')) {
-    return <ModernAutoMarker bearing={bearing} />;
+    return <ModernAutoMarker bearing={bearing} size={size} />;
   }
-  if (norm.includes('TRUCK') || norm.includes('CARGO') || norm.includes('🚚')) {
-    return <ModernTruckMarker bearing={bearing} />;
+  if (norm.includes('SUV') || norm.includes('PRIME') || norm.includes('🚙')) {
+    return <ModernSuvMarker bearing={bearing} size={size} />;
   }
-  return <ModernCabMarker bearing={bearing} />;
+  if (norm.includes('TRUCK') || norm.includes('CARGO') || norm.includes('HAUL') || norm.includes('🚚')) {
+    return <ModernTruckMarker bearing={bearing} size={size} />;
+  }
+  if (norm.includes('PARCEL') || norm.includes('COURIER') || norm.includes('PACKAGE') || norm.includes('📦')) {
+    return <ModernParcelMarker bearing={bearing} size={size} />;
+  }
+  return <ModernCabMarker bearing={bearing} size={size} />;
 };

@@ -3,6 +3,8 @@
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #ffffff;
+    color: #0f172a;
   }
   code, kbd, samp, pre {
     font-family: 'JetBrains Mono', monospace;
@@ -113,5 +115,64 @@
 
 .animate-ping-slow {
   animation: ping-slow 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* 📍 Animated Location Pin Keyframes */
+@keyframes pin-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes pin-ripple {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  50% { opacity: 0.5; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+
+@keyframes pin-ripple-secondary {
+  0% { transform: scale(0.4); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes pin-landing-bounce {
+  0% { transform: translateY(-16px) scale(0.95, 1.05); }
+  50% { transform: translateY(3px) scale(1.08, 0.92); }
+  75% { transform: translateY(-2px) scale(0.98, 1.02); }
+  100% { transform: translateY(0px) scale(1, 1); }
+}
+
+@keyframes pin-pulse-glow {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6)); }
+  50% { filter: drop-shadow(0 0 16px rgba(16, 185, 129, 0.95)); }
+}
+
+@keyframes gps-reticle-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.15); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+.animate-pin-float {
+  animation: pin-float 2.4s ease-in-out infinite;
+}
+
+.animate-pin-ripple-1 {
+  animation: pin-ripple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+.animate-pin-ripple-2 {
+  animation: pin-ripple-secondary 2s cubic-bezier(0, 0.2, 0.8, 1) infinite 0.7s;
+}
+
+.animate-pin-landing {
+  animation: pin-landing-bounce 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-pin-glow {
+  animation: pin-pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-gps-reticle {
+  animation: gps-reticle-spin 6s linear infinite;
 }
 

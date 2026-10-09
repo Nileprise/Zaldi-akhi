@@ -1,0 +1,42 @@
+<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Front Wheel (Faceted Low-Poly) -->
+  <polygon points="360,365 405,335 415,285 390,250 345,280 335,330" fill="#0f172a" />
+  <polygon points="360,365 335,330 345,280 370,310" fill="#1e293b" />
+  <polygon points="365,335 390,320 395,295 380,280 360,300" fill="#fde047" />
+
+  <!-- Rear Wheel (Faceted Low-Poly) -->
+  <polygon points="140,385 185,355 195,305 170,270 125,300 115,350" fill="#0f172a" />
+  <polygon points="140,385 115,350 125,300 150,330" fill="#1e293b" />
+  <polygon points="145,355 170,340 175,315 160,300 140,320" fill="#fde047" />
+
+  <!-- Lower Body / Chassis (Deep Royal Cobalt Blue) -->
+  <polygon points="110,340 240,355 350,340 435,285 330,280 180,290 85,310" fill="#1e3a8a" />
+  <polygon points="110,340 85,310 95,275 130,295" fill="#172554" />
+  <polygon points="240,355 350,340 435,285 415,265 245,315" fill="#1d4ed8" />
+
+  <!-- Front Wedge Hood (Deep Cobalt Facets) -->
+  <polygon points="330,280 435,285 415,245 320,240" fill="#2563eb" />
+  <polygon points="415,245 435,285 450,265 425,235" fill="#1d4ed8" />
+  <!-- Dual Angular Headlights -->
+  <polygon points="425,260 445,250 435,240 415,250" fill="#ffffff" />
+
+  <!-- Rear Trunk Deck -->
+  <polygon points="95,275 175,285 160,250 85,255" fill="#1e3a8a" />
+  <polygon points="85,255 160,250 145,235 75,245" fill="#172554" />
+
+  <!-- Cabin Windows (Faceted Glass) -->
+  <polygon points="160,250 320,240 290,185 185,195" fill="#38bdf8" fill-opacity="0.9" />
+  <polygon points="320,240 375,235 345,185 290,185" fill="#93c5fd" fill-opacity="0.85" />
+  <polygon points="160,250 185,195 145,205 130,255" fill="#0284c7" />
+
+  <!-- HIGH-CONTRAST ROOF (Vibrant Solar Yellow Top Plane) -->
+  <!-- Roof Side Edge -->
+  <polygon points="175,195 335,185 345,175 185,185" fill="#eab308" />
+  <!-- Roof Top Surface (Solar Yellow) -->
+  <polygon points="185,185 345,175 305,150 155,160" fill="#fde047" />
+
+  <!-- ZALDI 'Z' EMBLEM on the Roof (High Contrast Slate) -->
+  <polygon points="215,175 265,167 255,172 230,175" fill="#0f172a" />
+  <polygon points="255,172 230,175 250,181 220,186" fill="#0284c7" />
+  <polygon points="220,186 250,181 270,178 240,183" fill="#0f172a" />
+</svg>
