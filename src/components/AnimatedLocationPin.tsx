@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import boyPinImage from '../assets/images/boy_3d_pin_transparent.png';
-import { Navigation, MapPin, Compass } from 'lucide-react';
+import { Navigation, MapPin, Compass, Search } from 'lucide-react';
 
 export type PinStyleType = 'animated_radar' | 'character_pin' | 'precision_crosshair' | 'teardrop_3d';
 
@@ -12,6 +12,7 @@ interface AnimatedLocationPinProps {
   showAddressBadge?: boolean;
   className?: string;
   onCycleStyle?: () => void;
+  onUpdateAddress?: (newAddress: string) => void;
 }
 
 /**
@@ -20,7 +21,8 @@ interface AnimatedLocationPinProps {
  * - Real-time ground radar ripples radiating outward from contact point
  * - Reactive drag physics (lifts into air while map moves underneath, drops with contact bounce & shockwave upon settlement)
  * - GPS Current Location lock-on reticle animation
- * - Zero bulky card containers or borders
+ * - Inline search bar edit on address tap (no edit button, no modal card)
+ * - Pure 3D Boy Pin marker anchor (purely visual pointing to ground, no hover feedback tooltip)
  */
 export const AnimatedLocationPin: React.FC<AnimatedLocationPinProps> = ({
   address,
@@ -29,11 +31,30 @@ export const AnimatedLocationPin: React.FC<AnimatedLocationPinProps> = ({
   pinStyle = 'animated_radar',
   showAddressBadge = true,
   className = "",
-  onCycleStyle
+  onCycleStyle,
+  onUpdateAddress
 }) => {
   // Track landing bounce when map stops moving
   const [justLanded, setJustLanded] = useState(false);
   const wasMovingRef = useRef(false);
+
+  // Inline address search bar edit state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editInput, setEditInput] = useState(address || '');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setEditInput(address || '');
+    }
+  }, [address, isEditing]);
+
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [isEditing]);
 
   useEffect(() => {
     if (wasMovingRef.current && !isMapMoving) {
@@ -45,13 +66,23 @@ export const AnimatedLocationPin: React.FC<AnimatedLocationPinProps> = ({
     wasMovingRef.current = isMapMoving;
   }, [isMapMoving]);
 
+  const handleCommitEdit = () => {
+    const val = editInput.trim();
+    setIsEditing(false);
+    if (val && val !== address) {
+      onUpdateAddress?.(val);
+    } else {
+      setEditInput(address || '');
+    }
+  };
+
   return (
     <div className={`relative flex flex-col items-center select-none pointer-events-none ${className}`}>
       
-      {/* 1. FLOATING ADDRESS BADGE */}
+      {/* 1. FLOATING ADDRESS BADGE / INLINE SEARCH BAR EDIT */}
       {showAddressBadge && (
         <div className={`mb-2 transition-all duration-300 ease-out ${
-          isMapMoving ? 'opacity-90 scale-95 -translate-y-2' : 'opacity-100 scale-100 translate-y-0'
+          isMapMoving ? 'opacity-90 scale-95 -translate-y-2 pointer-events-none' : 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
         }`}>
           {isMapMoving ? (
             <div className="px-3 py-1 bg-slate-900/90 backdrop-blur-md border border-emerald-500/60 rounded-full shadow-2xl flex items-center gap-1.5 animate-pulse">
@@ -60,10 +91,45 @@ export const AnimatedLocationPin: React.FC<AnimatedLocationPinProps> = ({
                 Move map to set pickup
               </span>
             </div>
+          ) : isEditing ? (
+            /* CONVERTED TO SEARCH BAR EDIT INSIDE WHEN TAP ON ADDRESS (NO EDIT BUTTON) */
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="px-3 py-1 bg-slate-900/98 backdrop-blur-md border border-emerald-400 rounded-full shadow-2xl flex items-center gap-1.5 max-w-[340px] ring-2 ring-emerald-500/40 animate-in fade-in zoom-in-95 duration-150"
+            >
+              <Search className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={editInput}
+                onChange={(e) => setEditInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCommitEdit();
+                  } else if (e.key === 'Escape') {
+                    setIsEditing(false);
+                    setEditInput(address || '');
+                  }
+                }}
+                onBlur={handleCommitEdit}
+                placeholder="Search or enter pickup..."
+                className="bg-transparent font-bold text-[11px] text-white outline-none w-[170px] sm:w-[220px] placeholder:text-slate-400"
+              />
+            </div>
           ) : (
-            <div className="px-3 py-1 bg-slate-900/95 backdrop-blur-md border border-emerald-500/50 rounded-full shadow-2xl flex items-center gap-1.5 max-w-[270px]">
+            /* TAP ON ADDRESS CONVERTS TO EDIT ADDRESS (NO EDIT BUTTON) */
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+                setEditInput(address || '');
+              }}
+              className="px-3.5 py-1.5 bg-slate-900/95 backdrop-blur-md border border-emerald-500/60 hover:border-emerald-400 rounded-full shadow-2xl flex items-center gap-2 max-w-[320px] cursor-pointer hover:scale-105 active:scale-95 transition group"
+              title="Tap address to edit"
+            >
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-              <span className="text-[11px] font-black text-white truncate">
+              <span className="text-[11px] font-black text-white truncate max-w-[220px]">
                 {address || "Locating pickup point..."}
               </span>
             </div>
@@ -71,9 +137,9 @@ export const AnimatedLocationPin: React.FC<AnimatedLocationPinProps> = ({
         </div>
       )}
 
-      {/* 2. THE ELEVATED PIN BODY (Lifts & tilts while map moves, bounces on landing, floats when idle) */}
+      {/* 2. THE ELEVATED PIN BODY (Lifts & tilts while map moves, bounces on landing, purely visual marker) */}
       <div 
-        className={`relative z-20 flex flex-col items-center transition-transform duration-200 ease-out ${
+        className={`relative z-20 flex flex-col items-center pointer-events-none transition-transform duration-200 ease-out ${
           isMapMoving 
             ? '-translate-y-4 scale-105 rotate-[-2deg]' 
             : justLanded 
@@ -82,14 +148,15 @@ export const AnimatedLocationPin: React.FC<AnimatedLocationPinProps> = ({
         }`}
       >
         {pinStyle === 'character_pin' ? (
-          /* Character 3D Pin */
-          <div className="relative flex flex-col items-center">
-            <div className="absolute -inset-1 bg-emerald-500/25 blur-md rounded-full" />
+          /* Character 3D Boy Pin - Purely visual pointing to location, zero hover tooltip/card */
+          <div className="relative flex flex-col items-center pointer-events-none">
+            <div className="absolute -inset-1.5 bg-emerald-500/30 blur-md rounded-full pointer-events-none" />
             <img 
               src={boyPinImage} 
               alt="Pickup Location Pin" 
               className="w-12 h-16 object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.65)] relative z-10"
             />
+            
             {/* Jewel ground tip */}
             <div className="relative z-10 flex flex-col items-center">
               <div className="w-0.5 h-3 bg-gradient-to-b from-emerald-400 to-white shadow-[0_0_8px_#34d399] -mt-1" />
@@ -98,7 +165,7 @@ export const AnimatedLocationPin: React.FC<AnimatedLocationPinProps> = ({
           </div>
         ) : pinStyle === 'precision_crosshair' ? (
           /* Precision Crosshair Pin */
-          <div className="relative flex flex-col items-center">
+          <div className="relative flex flex-col items-center pointer-events-none">
             <div className="w-10 h-10 rounded-full border-2 border-emerald-400 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.7)] animate-pin-glow">
               <Navigation className="w-5 h-5 text-emerald-400 transform rotate-45" />
             </div>
@@ -107,7 +174,7 @@ export const AnimatedLocationPin: React.FC<AnimatedLocationPinProps> = ({
           </div>
         ) : (
           /* Modern Animated Radar Teardrop Pin (Default) */
-          <div className="relative flex flex-col items-center">
+          <div className="relative flex flex-col items-center pointer-events-none">
             {/* Ambient Aura Halo */}
             <div className="absolute -inset-2 bg-emerald-500/30 blur-lg rounded-full" />
 

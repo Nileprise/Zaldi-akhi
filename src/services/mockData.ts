@@ -4,7 +4,7 @@ export const VEHICLE_OPTIONS: VehicleTier[] = [
   { 
     id: "BIKE", 
     name: "Bike Moto", 
-    capacity: "1 Rider", 
+    capacity: "1 person", 
     baseFare: 0, 
     perKm: 8.0, 
     etaMin: 2, 
@@ -15,7 +15,7 @@ export const VEHICLE_OPTIONS: VehicleTier[] = [
   { 
     id: "AUTO", 
     name: "Auto 3W", 
-    capacity: "3 Seats", 
+    capacity: "3 persons", 
     baseFare: 0, 
     perKm: 8.0, 
     etaMin: 4, 
@@ -26,7 +26,7 @@ export const VEHICLE_OPTIONS: VehicleTier[] = [
   { 
     id: "CAB", 
     name: "Cab Prime", 
-    capacity: "4 Seats", 
+    capacity: "4 persons", 
     baseFare: 0, 
     perKm: 8.0, 
     etaMin: 6, 
@@ -37,7 +37,7 @@ export const VEHICLE_OPTIONS: VehicleTier[] = [
   { 
     id: "PREMIUM", 
     name: "Zaldi XL", 
-    capacity: "6 Seats", 
+    capacity: "6 persons", 
     baseFare: 0, 
     perKm: 8.0, 
     etaMin: 9, 
@@ -48,7 +48,7 @@ export const VEHICLE_OPTIONS: VehicleTier[] = [
   { 
     id: "TRUCK", 
     name: "Mini Truck", 
-    capacity: "Up to 750kg", 
+    capacity: "Max 750 kg", 
     baseFare: 0, 
     perKm: 8.0, 
     etaMin: 14, 

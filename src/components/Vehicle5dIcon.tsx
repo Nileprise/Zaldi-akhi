@@ -48,8 +48,8 @@ export const VEHICLE_5D_THEMES: Record<string, VehicleThemeConfig> = {
     badgeText: 'text-cyan-400',
     highlightGradient: 'from-cyan-400/25 via-transparent to-transparent',
     label: 'Zaldi Moto EV',
-    lowPolyPng: bikeLowPolyPng,
-    lowPoly64: bikeLowPoly64,
+    lowPolyPng: bikePhotoreal,
+    lowPoly64: bikePhotoreal,
     photorealPng: bikePhotoreal,
     glbModelPath: '/models/zaldi-bike-lowpoly.glb'
   },
@@ -60,8 +60,8 @@ export const VEHICLE_5D_THEMES: Record<string, VehicleThemeConfig> = {
     badgeText: 'text-amber-400',
     highlightGradient: 'from-amber-400/25 via-transparent to-transparent',
     label: 'Zaldi TukTuk 3W',
-    lowPolyPng: autoLowPolyPng,
-    lowPoly64: autoLowPoly64,
+    lowPolyPng: autoPhotoreal,
+    lowPoly64: autoPhotoreal,
     photorealPng: autoPhotoreal,
     glbModelPath: '/models/zaldi-auto-lowpoly.glb'
   },

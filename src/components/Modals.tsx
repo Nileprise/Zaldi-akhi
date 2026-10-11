@@ -6,121 +6,41 @@ import {
 } from 'lucide-react';
 import { Driver, RideOrder } from '../types';
 import { sounds } from '../services/audio';
+import { TripCockpitChat } from './TripCockpitChat';
 
 interface ChatModalProps {
   driver: Driver;
   order: RideOrder | null;
   onClose: () => void;
+  onSendMessage?: (orderId: string, sender: 'PASSENGER' | 'DRIVER', text: string) => void;
+  role?: 'PASSENGER' | 'DRIVER';
+  onSwitchRole?: () => void;
 }
 
-export const ChatModal: React.FC<ChatModalProps> = ({ driver, order, onClose }) => {
-  const [messages, setMessages] = useState<Array<{ sender: 'user' | 'driver'; text: string; time: string }>>([
-    { sender: 'driver', text: `Hi! I am on my way to ${order?.pickup || 'your pickup'}. ETA 3 mins.`, time: 'Just now' }
-  ]);
-  const [inputText, setInputText] = useState('');
-
-  const quickReplies = [
-    "I am near the main gate",
-    "Please wait 2 minutes",
-    "Reached pickup location",
-    "Which vehicle color?"
-  ];
-
-  const handleSend = (textToSend?: string) => {
-    const text = textToSend || inputText.trim();
-    if (!text) return;
-    sounds.playPop();
-    const newMsg = { sender: 'user' as const, text, time: 'Just now' };
-    setMessages(prev => [...prev, newMsg]);
-    setInputText('');
-
-    // Simulated driver response after 1.2s
-    setTimeout(() => {
-      sounds.playPing();
-      const driverReplies = [
-        "Sure, turning into the lane now!",
-        "Understood, waiting right there.",
-        "Got it! White helmet and hazard lights on.",
-        "Okay, almost there in 60 seconds."
-      ];
-      const randomReply = driverReplies[Math.floor(Math.random() * driverReplies.length)];
-      setMessages(prev => [...prev, { sender: 'driver', text: randomReply, time: 'Just now' }]);
-    }, 1200);
-  };
+export const ChatModal: React.FC<ChatModalProps> = ({ 
+  driver, 
+  order, 
+  onClose,
+  onSendMessage,
+  role = 'PASSENGER',
+  onSwitchRole
+}) => {
+  if (!order) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col h-[520px] overflow-hidden text-slate-100">
-        
-        {/* Header */}
-        <div className="p-4 bg-slate-800/80 border-b border-slate-700/80 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-sm font-black text-blue-300">
-              {driver.name.charAt(0)}
-            </div>
-            <div>
-              <div className="font-bold text-sm text-white flex items-center gap-1.5">
-                <span>{driver.name}</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              </div>
-              <div className="text-xs text-slate-400">{driver.vehicle} • {driver.plate}</div>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-700/50">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Message stream */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.map((m, idx) => (
-            <div key={idx} className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}>
-              <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-medium ${
-                m.sender === 'user'
-                  ? 'bg-brand-blue text-white rounded-br-none shadow-md shadow-blue-600/20'
-                  : 'bg-slate-800 text-slate-200 border border-slate-700/80 rounded-bl-none'
-              }`}>
-                {m.text}
-              </div>
-              <span className="text-[10px] text-slate-500 mt-1 px-1">{m.time}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Quick chip responses */}
-        <div className="px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar border-t border-slate-800/80 bg-slate-900/60">
-          {quickReplies.map((qr, i) => (
-            <button
-              key={i}
-              onClick={() => handleSend(qr)}
-              className="flex-shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition"
-            >
-              {qr}
-            </button>
-          ))}
-        </div>
-
-        {/* Input */}
-        <div className="p-3 bg-slate-800/60 border-t border-slate-700/60 flex items-center gap-2">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Type message to Captain..."
-            className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-          />
-          <button
-            onClick={() => handleSend()}
-            className="p-2.5 bg-brand-blue text-white rounded-xl shadow-lg hover:bg-blue-600 transition disabled:opacity-50"
-            disabled={!inputText.trim()}
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
-
-      </div>
-    </div>
+    <TripCockpitChat
+      order={order}
+      driver={driver}
+      currentRole={role}
+      onSendMessage={(orderId, sender, text) => {
+        if (onSendMessage) {
+          onSendMessage(orderId, sender, text);
+        }
+      }}
+      onClose={onClose}
+      isModal={true}
+      onSwitchCockpitRole={onSwitchRole}
+    />
   );
 };
 

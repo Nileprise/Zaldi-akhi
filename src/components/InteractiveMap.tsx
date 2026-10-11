@@ -2,8 +2,10 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { 
   Compass, Navigation, Sun, Moon, ShieldAlert, 
   RotateCcw, Clock, CheckCircle2, Layers, Crosshair, 
-  Radio, Train, Activity, Eye, SlidersHorizontal, Sparkles
+  Radio, Train, Activity, Eye, SlidersHorizontal, Sparkles,
+  Search, X
 } from 'lucide-react';
+import boyPinImage from '../assets/images/boy_3d_pin_transparent.png';
 import { BookingStatus, RoutePoint } from '../types';
 import { 
   generateActualRoadRoute, 
@@ -35,6 +37,7 @@ interface InteractiveMapProps {
   status: BookingStatus;
   progressPercent?: number;
   vehicleTierName?: string;
+  selectedVehicleId?: string;
   vehicleIcon?: string;
   isNightMode?: boolean;
   onToggleNightMode?: () => void;
@@ -51,6 +54,14 @@ interface InteractiveMapProps {
   onUseCurrentLocation?: () => void;
   locationPinType?: any;
   onChangePinType?: (type: any) => void;
+  onEditPickup?: () => void;
+  onUpdatePickup?: (newPickup: string) => void;
+  // Carpool Corridor Props
+  carpoolRoutePolyline?: RoutePoint[];
+  carpoolStops?: { id: string; name: string; location: { x: number; y: number } }[];
+  carpoolDriverPos?: { x: number; y: number; headingDeg: number };
+  carpoolDriverName?: string;
+  isCarpoolActive?: boolean;
 }
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
@@ -59,6 +70,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   status,
   progressPercent = 0,
   vehicleTierName = 'Cab',
+  selectedVehicleId,
   isNightMode = false,
   onToggleNightMode,
   showNearbyDrivers = true,
@@ -71,7 +83,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onConfirmLocation,
   onUseCurrentLocation,
   locationPinType,
-  onChangePinType
+  onChangePinType,
+  onEditPickup,
+  onUpdatePickup,
+  carpoolRoutePolyline,
+  carpoolStops,
+  carpoolDriverPos,
+  carpoolDriverName,
+  isCarpoolActive = false
 }) => {
   // Container ref for client bounding rect
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -99,6 +118,39 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Manual Zoom state
   const [userZoom, setUserZoom] = useState<number | null>(null);
   const touchDistRef = useRef<number | null>(null);
+
+  // Active route pickup pin inline search bar edit state
+  const [isRoutePillEditing, setIsRoutePillEditing] = useState(false);
+  const [routePillInput, setRoutePillInput] = useState(pickup || '');
+
+  useEffect(() => {
+    if (!isRoutePillEditing) {
+      setRoutePillInput(pickup || '');
+    }
+  }, [pickup, isRoutePillEditing]);
+
+  const handleUpdatePickupAddress = useCallback((newAddr: string) => {
+    const finalAddr = newAddr.trim();
+    if (!finalAddr) return;
+    sounds.playSuccess();
+    setLiveAddress(finalAddr);
+    // Pan map to resolved junction for this address
+    const resolvedJunction = resolveAddressToRoadJunction(finalAddr);
+    setMapCenter(resolvedJunction);
+    onAddressResolved?.(finalAddr, resolvedJunction);
+    onConfirmLocation?.(finalAddr);
+    onUpdatePickup?.(finalAddr);
+  }, [onAddressResolved, onConfirmLocation, onUpdatePickup]);
+
+  const handleCommitRoutePill = () => {
+    const val = routePillInput.trim();
+    setIsRoutePillEditing(false);
+    if (val && val !== pickup) {
+      handleUpdatePickupAddress(val);
+    } else {
+      setRoutePillInput(pickup || '');
+    }
+  };
 
   // Pin style selector
   const [activePinStyle, setActivePinStyle] = useState<PinStyleType>(
@@ -155,43 +207,103 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     sounds.playPop();
   };
 
-  // Simulated live nearby drivers before booking - dynamically anchored around current map center
+  // Normalize selected vehicle type to match 5D vehicle themes ('BIKE', 'AUTO', 'CAB', 'PREMIUM', 'TRUCK', 'PARCEL')
+  const normalizedVehicleType = useMemo(() => {
+    const raw = (selectedVehicleId || vehicleTierName || 'AUTO').toUpperCase();
+    if (raw.includes('BIKE') || raw.includes('MOTO')) return 'BIKE';
+    if (raw.includes('AUTO') || raw.includes('TUKTUK') || raw.includes('3W')) return 'AUTO';
+    if (raw.includes('PREMIUM') || raw.includes('SUV') || raw.includes('XL') || raw.includes('PRIME')) return 'PREMIUM';
+    if (raw.includes('TRUCK') || raw.includes('HAUL') || raw.includes('CARGO')) return 'TRUCK';
+    if (raw.includes('PARCEL')) return 'PARCEL';
+    return 'CAB';
+  }, [selectedVehicleId, vehicleTierName]);
+
+  // 1. Resolve Pickup and Destination road junctions (anchors to pickup address if set, else current location / fixed pin)
+  const pickupJunction = useMemo(() => {
+    if (pickup && pickup.trim()) return resolveAddressToRoadJunction(pickup);
+    return fixedPinPos || mapCenter;
+  }, [pickup, fixedPinPos, mapCenter]);
+
+  // Simulated live nearby drivers before booking - dynamically cruising along real roads around current/pickup location
   const [nearbyDriverOffsets, setNearbyDriverOffsets] = useState([
-    { id: 'd-bike', icon: '🏍️', name: 'Bike', dx: -6.5, dy: -6.0, heading: 45 },
-    { id: 'd-auto', icon: '🛺', name: 'Auto', dx: 7.5, dy: -5.0, heading: 120 },
-    { id: 'd-cab', icon: '🚕', name: 'Cab', dx: -8.0, dy: 6.5, heading: 220 },
-    { id: 'd-truck', icon: '🚚', name: 'Truck', dx: 8.5, dy: 7.0, heading: 310 }
+    { id: 'auto-1', dx: -6.5, dy: -4.5, heading: 90, speed: 0.18, dirX: 1, dirY: 0, roadAxis: 'x' as const },
+    { id: 'auto-2', dx: 5.5, dy: -5.0, heading: 180, speed: 0.22, dirX: 0, dirY: 1, roadAxis: 'y' as const },
+    { id: 'auto-3', dx: -7.0, dy: 4.8, heading: 270, speed: 0.19, dirX: -1, dirY: 0, roadAxis: 'x' as const },
+    { id: 'auto-4', dx: 6.2, dy: 6.0, heading: 0, speed: 0.24, dirX: 0, dirY: -1, roadAxis: 'y' as const },
+    { id: 'auto-5', dx: -2.5, dy: 7.2, heading: 90, speed: 0.16, dirX: 1, dirY: 0, roadAxis: 'x' as const },
+    { id: 'auto-6', dx: 3.8, dy: -7.0, heading: 270, speed: 0.21, dirX: -1, dirY: 0, roadAxis: 'x' as const },
   ]);
 
-  // Real-time drift of online nearby drivers
+  // Real-time smooth dynamic tracking & road movement of nearby drivers
   useEffect(() => {
     if (status !== 'IDLE' && status !== 'FINDING_DRIVER') return;
     const interval = setInterval(() => {
-      setNearbyDriverOffsets(prev => prev.map(d => ({
-        ...d,
-        dx: +(d.dx + (Math.random() - 0.5) * 0.4).toFixed(2),
-        dy: +(d.dy + (Math.random() - 0.5) * 0.4).toFixed(2)
-      })));
-    }, 2000);
+      setNearbyDriverOffsets(prev => prev.map(d => {
+        let newDx = d.dx;
+        let newDy = d.dy;
+        let newDirX = d.dirX;
+        let newDirY = d.dirY;
+        let newHeading = d.heading;
+        let newAxis = d.roadAxis;
+
+        if (d.roadAxis === 'x') {
+          newDx = +(d.dx + d.dirX * d.speed).toFixed(3);
+          // Turn at road block limits
+          if (Math.abs(newDx) > 11) {
+            newDirX = -d.dirX;
+            // 40% chance to turn onto perpendicular cross street
+            if (Math.random() > 0.6) {
+              newAxis = 'y';
+              newDirY = Math.random() > 0.5 ? 1 : -1;
+              newHeading = newDirY > 0 ? 180 : 0;
+            } else {
+              newHeading = newDirX > 0 ? 90 : 270;
+            }
+          } else {
+            newHeading = d.dirX > 0 ? 90 : 270;
+          }
+        } else {
+          newDy = +(d.dy + d.dirY * d.speed).toFixed(3);
+          // Turn at road block limits
+          if (Math.abs(newDy) > 10) {
+            newDirY = -d.dirY;
+            // 40% chance to turn onto perpendicular cross street
+            if (Math.random() > 0.6) {
+              newAxis = 'x';
+              newDirX = Math.random() > 0.5 ? 1 : -1;
+              newHeading = newDirX > 0 ? 90 : 270;
+            } else {
+              newHeading = newDirY > 0 ? 180 : 0;
+            }
+          } else {
+            newHeading = d.dirY > 0 ? 180 : 0;
+          }
+        }
+
+        return {
+          ...d,
+          dx: newDx,
+          dy: newDy,
+          dirX: newDirX,
+          dirY: newDirY,
+          roadAxis: newAxis,
+          heading: newHeading
+        };
+      }));
+    }, 1200);
     return () => clearInterval(interval);
   }, [status]);
 
-  // 1. Resolve Pickup and Destination road junctions
-  const pickupJunction = useMemo(() => {
-    if (status === 'IDLE') return mapCenter;
-    if (!pickup) return mapCenter;
-    return resolveAddressToRoadJunction(pickup);
-  }, [status, pickup, mapCenter]);
-
-  // Live positions of nearby drivers dynamically surrounding the customer's pickup area
+  // Live positions of nearby rides dynamically surrounding the customer's pickup or current location
   const liveNearbyDrivers = useMemo(() => {
-    const center = status === 'IDLE' ? mapCenter : (pickup ? pickupJunction : mapCenter);
+    const center = pickupJunction;
     return nearbyDriverOffsets.map(d => ({
       ...d,
+      type: normalizedVehicleType,
       x: Math.max(8, Math.min(92, +(center.x + d.dx).toFixed(1))),
       y: Math.max(12, Math.min(88, +(center.y + d.dy).toFixed(1)))
     }));
-  }, [status, pickup, pickupJunction, mapCenter, nearbyDriverOffsets]);
+  }, [pickupJunction, nearbyDriverOffsets, normalizedVehicleType]);
 
   const dropJunction = useMemo(() => {
     if (!drop) return { x: 70, y: 34 };
@@ -203,6 +315,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     if (!pickup || !drop) return null;
     return generateActualRoadRoute(pickup, drop);
   }, [pickup, drop]);
+
+  // Carpool Corridor Road Route SVG Path
+  const carpoolCorridorSvgPath = useMemo(() => {
+    if (!carpoolRoutePolyline || carpoolRoutePolyline.length < 2) return null;
+    let d = `M ${carpoolRoutePolyline[0].x} ${carpoolRoutePolyline[0].y}`;
+    for (let i = 1; i < carpoolRoutePolyline.length; i++) {
+      d += ` L ${carpoolRoutePolyline[i].x} ${carpoolRoutePolyline[i].y}`;
+    }
+    return d;
+  }, [carpoolRoutePolyline]);
 
   // Initial approximate driver location (spawns ~1.4 km from pickup on road network)
   const initialDriverPos = useMemo<RoutePoint>(() => {
@@ -464,6 +586,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               <stop offset="100%" stopColor="#10b981" />
             </linearGradient>
 
+            {/* Carpool Corridor Highway Gradient */}
+            <linearGradient id="carpoolCorridorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#3b82f6" />
+              <stop offset="50%" stopColor="#06b6d4" />
+              <stop offset="100%" stopColor="#10b981" />
+            </linearGradient>
+
             {/* Satellite Terrain Grid Pattern */}
             <pattern id="satGrid" width="6" height="6" patternUnits="userSpaceOnUse">
               <path d="M 6 0 L 0 0 0 6" fill="none" stroke="#162e24" strokeWidth="0.25" opacity="0.6" />
@@ -722,6 +851,44 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               />
             </>
           )}
+
+          {/* 3. CARPOOL CORRIDOR HIGHWAY ROUTE (Visible when viewing carpool route) */}
+          {(isCarpoolActive || carpoolCorridorSvgPath) && carpoolCorridorSvgPath && (
+            <>
+              {/* Outer Corridor Glow */}
+              <path
+                d={carpoolCorridorSvgPath}
+                fill="none"
+                stroke="#06b6d4"
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.35"
+                filter="url(#routeGlow)"
+              />
+              {/* Main Vivid Highway Corridor Line */}
+              <path
+                d={carpoolCorridorSvgPath}
+                fill="none"
+                stroke="url(#carpoolCorridorGrad)"
+                strokeWidth="2.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Directional Shimmer Flow Line */}
+              <path
+                d={carpoolCorridorSvgPath}
+                fill="none"
+                stroke="#ffffff"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray="4 3"
+                className="animate-dash"
+                opacity="0.95"
+              />
+            </>
+          )}
         </svg>
 
         {/* Metro Station Badges (when transit layer enabled) */}
@@ -742,16 +909,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </>
         )}
 
-        {/* Fleet Density Badges (when fleetGIS layer enabled) */}
-        {layers.fleetGIS && (
-          <div className="absolute top-[34%] left-[30%] -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/50 backdrop-blur-md text-[8px] font-bold text-cyan-300 shadow">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
-              <span>18 Captains Active</span>
-            </div>
-          </div>
-        )}
-
         {/* Authentic POI Landmark Marker */}
         <div 
           className="absolute top-[62%] left-[34%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
@@ -762,19 +919,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </div>
         </div>
 
-        {/* BEFORE BOOKING: SHOW NEARBY AVAILABLE ONLINE DRIVERS AROUND PICKUP */}
+        {/* BEFORE BOOKING: SHOW NEARBY RIDES NEAR CURRENT OR PICKUP LOCATION BY SELECTED VEHICLE */}
         {showNearbyDrivers && (status === 'IDLE' || status === 'FINDING_DRIVER') && liveNearbyDrivers.map((d) => {
-          const type = d.id === 'd-bike' ? 'BIKE' : d.id === 'd-auto' ? 'AUTO' : d.id === 'd-cab' ? 'CAB' : 'TRUCK';
           return (
             <div
               key={d.id}
               style={{ top: `${d.y}%`, left: `${d.x}%` }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-700 ease-out z-10"
+              className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-1000 ease-linear z-10 flex flex-col items-center"
             >
               <LiveMapVehicleMarker 
-                type={type}
+                type={d.type}
                 heading={d.heading}
-                size={34}
+                size={36}
               />
             </div>
           );
@@ -787,6 +943,74 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             className="absolute -translate-x-1/2 -translate-y-full z-20 pointer-events-none"
           >
             <Destination3dPin address={drop} />
+          </div>
+        )}
+
+        {/* 📍 BOY PICKUP PIN (When route is active or ride is in progress) */}
+        {pickup && (status !== 'IDLE' || Boolean(drop && roadRoute)) && (
+          <div
+            style={{ top: `${pickupJunction.y}%`, left: `${pickupJunction.x}%` }}
+            className="absolute -translate-x-1/2 -translate-y-[88%] z-25 pointer-events-auto select-none"
+          >
+            <div className="relative flex flex-col items-center">
+              {/* Floating Address Pill - Tap on address converts to search bar edit (no edit button) */}
+              {isRoutePillEditing ? (
+                <div 
+                  onClick={(e) => e.stopPropagation()}
+                  className="mb-1 px-3 py-1 bg-slate-900/98 backdrop-blur-md border border-emerald-400 rounded-full shadow-2xl flex items-center gap-1.5 max-w-[300px] ring-2 ring-emerald-500/40 animate-in fade-in zoom-in-95 pointer-events-auto"
+                >
+                  <Search className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={routePillInput}
+                    onChange={(e) => setRoutePillInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCommitRoutePill();
+                      } else if (e.key === 'Escape') {
+                        setIsRoutePillEditing(false);
+                        setRoutePillInput(pickup);
+                      }
+                    }}
+                    onBlur={handleCommitRoutePill}
+                    placeholder="Search or enter pickup..."
+                    className="bg-transparent font-bold text-[10px] text-white outline-none w-[160px] placeholder:text-slate-400"
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsRoutePillEditing(true);
+                    setRoutePillInput(pickup);
+                  }}
+                  className="mb-1 px-3 py-1.5 bg-slate-900/95 backdrop-blur-md border border-emerald-500/60 hover:border-emerald-400 rounded-full shadow-2xl flex items-center gap-1.5 max-w-[280px] cursor-pointer hover:scale-105 active:scale-95 transition pointer-events-auto"
+                  title="Tap address to edit"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                  <span className="text-[10px] font-black text-white truncate max-w-[200px]">
+                    {pickup}
+                  </span>
+                </div>
+              )}
+
+              {/* Boy Character - Purely visual marker */}
+              <div className="flex flex-col items-center pointer-events-none">
+                <div className="absolute -inset-1.5 bg-emerald-500/30 blur-md rounded-full pointer-events-none" />
+                <img 
+                  src={boyPinImage} 
+                  alt="Pickup Boy Pin" 
+                  className="w-12 h-16 object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.65)] relative z-10"
+                />
+
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="w-0.5 h-3 bg-gradient-to-b from-emerald-400 to-white shadow-[0_0_8px_#34d399] -mt-1" />
+                  <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399] border-2 border-white" />
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -834,6 +1058,49 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </div>
         )}
 
+        {/* 🛣️ CARPOOL CORRIDOR WAYPOINT STOP NODES & LIVE MOVING CARPOOL VEHICLE */}
+        {isCarpoolActive && (
+          <>
+            {/* Waypoint Stop Badges on Road Network */}
+            {carpoolStops && carpoolStops.map((stop, sIdx) => (
+              <div
+                key={stop.id}
+                style={{ top: `${stop.location.y}%`, left: `${stop.location.x}%` }}
+                className="absolute -translate-x-1/2 -translate-y-1/2 z-22 pointer-events-none"
+              >
+                <div className="flex flex-col items-center">
+                  <div className="px-2 py-0.5 rounded-full bg-slate-950/90 text-white border border-cyan-400/80 text-[8px] font-black shadow-lg flex items-center gap-1 whitespace-nowrap mb-0.5 backdrop-blur-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <span>{stop.name}</span>
+                  </div>
+                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 border-2 border-white shadow-md ring-2 ring-cyan-500/40" />
+                </div>
+              </div>
+            ))}
+
+            {/* Live Moving Carpool Driver on the Corridor */}
+            {carpoolDriverPos && (
+              <div
+                style={{ top: `${carpoolDriverPos.y}%`, left: `${carpoolDriverPos.x}%` }}
+                className="absolute -translate-x-1/2 -translate-y-1/2 z-35 pointer-events-none transition-all duration-1000 ease-linear flex flex-col items-center"
+              >
+                {/* Live Carpool Driver Tag */}
+                <div className="mb-1 px-2.5 py-0.5 rounded-full bg-slate-950/95 text-white border border-blue-400 text-[9px] font-black shadow-xl flex items-center gap-1.5 whitespace-nowrap backdrop-blur-md">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>{carpoolDriverName || 'Carpool Driver'}</span>
+                </div>
+
+                {/* 3D Carpool Vehicle Marker */}
+                <LiveMapVehicleMarker 
+                  type="PREMIUM"
+                  heading={carpoolDriverPos.headingDeg}
+                  size={40}
+                />
+              </div>
+            )}
+          </>
+        )}
+
       </div>
 
       {/* 📍 ANIMATED LOCATION PIN (STAYS FIXED ON SCREEN WHILE MAP MOVES UNDERNEATH) */}
@@ -848,6 +1115,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             pinStyle={activePinStyle}
             showAddressBadge={true}
             onCycleStyle={handleCyclePinStyle}
+            onUpdateAddress={handleUpdatePickupAddress}
           />
         </div>
       )}

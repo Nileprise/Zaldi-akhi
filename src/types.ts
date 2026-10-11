@@ -68,6 +68,18 @@ export interface Driver {
 
 export type ServiceMode = 'PERSON' | 'PARCEL';
 
+export interface TripMessage {
+  id: string;
+  orderId: string;
+  sender: 'PASSENGER' | 'DRIVER';
+  senderName: string;
+  text: string;
+  timestamp: string;
+  createdAtMs: number;
+  readByPassenger?: boolean;
+  readByDriver?: boolean;
+}
+
 export interface RideOrder {
   id: string;
   customerName: string;
@@ -91,6 +103,7 @@ export interface RideOrder {
   parcelWeightKg?: number;
   luggageWeightKg?: number;
   extraLuggageFee?: number;
+  messages?: TripMessage[];
 }
 
 export interface LocationItem {
@@ -113,6 +126,11 @@ export interface CarpoolRoute {
   totalSeats: number;
   pricePerSeat: number;
   verifiedDriver: boolean;
+  driverPhone?: string;
+  rating?: number;
+  // Enhanced corridor & segment properties
+  viaStops?: string[];
+  highwayCorridor?: string;
 }
 
 export interface OutstationPackage {

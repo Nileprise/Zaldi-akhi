@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  AppRole, Driver, RideOrder 
+  AppRole, Driver, RideOrder, TripMessage 
 } from './types';
 import { INITIAL_DRIVERS } from './services/mockData';
 import { CustomerApp } from './components/CustomerApp';
@@ -14,6 +14,7 @@ import { AdminApp } from './components/AdminApp';
 import { FleetTelematicsGIS } from './components/FleetTelematicsGIS';
 import { ArchitecturalDepotViewer } from './components/ArchitecturalDepotViewer';
 import { sounds } from './services/audio';
+import { tripChatBroadcaster } from './services/tripChatService';
 import { 
   Smartphone, UserCheck, Shield, Sparkles, 
   Volume2, Car, Bell, ExternalLink, KeyRound, LogOut, ArrowLeft,
@@ -28,30 +29,31 @@ export default function App() {
   const [drivers, setDrivers] = useState<Driver[]>(INITIAL_DRIVERS);
   const [selectedDriverId, setSelectedDriverId] = useState<string>('cap-ravi-001');
 
-  // Initial order for demonstration
-  const [orders, setOrders] = useState<RideOrder[]>([
-    {
-      id: "TRP-8F29A1",
-      customerName: "Akhil Nalla",
-      customerPhone: "+91 98480-12345",
-      pickup: "Warangal Railway Station",
-      drop: "Lashkar Bazaar Center, Hanamkonda",
-      distanceKm: 6.2,
-      fare: 120,
-      discount: 0,
-      finalFare: 120,
-      vehicleTier: "Auto 3W",
-      vehicleIcon: "🛺",
-      driverId: "cap-vikram-002",
-      riderPin: "4921",
-      status: "COMPLETED",
-      paymentMethod: "UPI",
-      createdAt: "09:12 AM",
-      progressPercent: 100
-    }
-  ]);
+  // Orders state
+  const [orders, setOrders] = useState<RideOrder[]>([]);
 
   const activeDriver = drivers.find(d => d.id === selectedDriverId) || drivers[0];
+
+  // Listen to cross-tab broadcast events for real-time trip messages
+  useEffect(() => {
+    const unsubscribe = tripChatBroadcaster.subscribe((incomingMsg: TripMessage) => {
+      setOrders(prev => prev.map(o => {
+        if (o.id === incomingMsg.orderId) {
+          if (o.messages?.some(m => m.id === incomingMsg.id)) {
+            return o;
+          }
+          return {
+            ...o,
+            messages: [...(o.messages || []), incomingMsg]
+          };
+        }
+        return o;
+      }));
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const handleNewOrder = (order: RideOrder) => {
     setOrders(prev => [order, ...prev]);
@@ -61,14 +63,42 @@ export default function App() {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
   };
 
+  const handleSendMessage = (orderId: string, sender: 'PASSENGER' | 'DRIVER', text: string) => {
+    const order = orders.find(o => o.id === orderId);
+    const assignedDriver = drivers.find(d => d.id === (order?.driverId || activeDriver.id)) || activeDriver;
+    const senderName = sender === 'PASSENGER' 
+      ? (order?.customerName || 'Akhil (Passenger)') 
+      : `${assignedDriver.name} (Captain)`;
+
+    const newMsg = tripChatBroadcaster.createMessage({
+      orderId,
+      sender,
+      senderName,
+      text
+    });
+
+    setOrders(prev => prev.map(o => {
+      if (o.id === orderId) {
+        return {
+          ...o,
+          messages: [...(o.messages || []), newMsg]
+        };
+      }
+      return o;
+    }));
+
+    tripChatBroadcaster.broadcast(newMsg);
+  };
+
   const handleUpdateDriver = (driverId: string, updates: Partial<Driver>) => {
     setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, ...updates } : d));
   };
 
   const handleSimulateIncomingRide = () => {
     sounds.playAlert();
+    const orderId = "TRP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
     const mockOrder: RideOrder = {
-      id: "TRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+      id: orderId,
       customerName: "Kavya Patel",
       customerPhone: "+91 98112-99882",
       pickup: "Hitec City Metro Station",
@@ -84,7 +114,15 @@ export default function App() {
       status: "SEARCHING",
       paymentMethod: "WALLET",
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      progressPercent: 0
+      progressPercent: 0,
+      messages: [
+        tripChatBroadcaster.createMessage({
+          orderId,
+          sender: 'PASSENGER',
+          senderName: 'Kavya Patel (Passenger)',
+          text: 'Hi Captain! Waiting at Hitec City Metro Pillar 32.'
+        })
+      ]
     };
     setOrders(prev => [mockOrder, ...prev]);
   };
@@ -312,6 +350,11 @@ export default function App() {
             orders={orders}
             onNewOrder={handleNewOrder}
             onUpdateOrder={handleUpdateOrder}
+            onSendMessage={handleSendMessage}
+            onSwitchToCaptain={() => {
+              setAuthenticatedRole('DRIVER_APP');
+              setActiveApp('DRIVER_APP');
+            }}
           />
         )}
 
@@ -335,6 +378,8 @@ export default function App() {
             orders={orders}
             onUpdateOrder={handleUpdateOrder}
             onSimulateIncomingRide={handleSimulateIncomingRide}
+            onSendMessage={handleSendMessage}
+            onSwitchToCustomer={() => setActiveApp('CUSTOMER_APP')}
           />
         )}
 

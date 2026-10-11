@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   Power, ShieldCheck, Star, Navigation, MapPin, 
   DollarSign, CheckCircle2, AlertCircle, Phone, 
-  Radio, TrendingUp, Award, Clock, ArrowRight
+  Radio, TrendingUp, Award, Clock, ArrowRight, MessageSquare
 } from 'lucide-react';
 import { Driver, RideOrder } from '../types';
 import { sounds } from '../services/audio';
 import { Vehicle3dIcon } from './Vehicle3dIcon';
+import { TripCockpitChat } from './TripCockpitChat';
 
 interface CaptainAppProps {
   drivers: Driver[];
@@ -15,6 +16,8 @@ interface CaptainAppProps {
   orders: RideOrder[];
   onUpdateOrder: (orderId: string, updates: Partial<RideOrder>) => void;
   onSimulateIncomingRide: () => void;
+  onSendMessage?: (orderId: string, sender: 'PASSENGER' | 'DRIVER', text: string) => void;
+  onSwitchToCustomer?: () => void;
 }
 
 export const CaptainApp: React.FC<CaptainAppProps> = ({
@@ -23,7 +26,9 @@ export const CaptainApp: React.FC<CaptainAppProps> = ({
   onSelectDriver,
   orders,
   onUpdateOrder,
-  onSimulateIncomingRide
+  onSimulateIncomingRide,
+  onSendMessage,
+  onSwitchToCustomer
 }) => {
   const activeDriver = drivers.find(d => d.id === selectedDriverId) || drivers[0];
   const [isOnline, setIsOnline] = useState(activeDriver.isOnline);
@@ -31,9 +36,10 @@ export const CaptainApp: React.FC<CaptainAppProps> = ({
   const [otpError, setOtpError] = useState(false);
 
   // Incoming ride request (either assigned to this driver or pending)
-  const incomingOrder = orders.find(o => o.status === 'SEARCHING') || null;
+  const incomingOrder = orders.find(o => o.status === 'SEARCHING' || o.status === 'FINDING_DRIVER') || null;
   const currentTrip = orders.find(o => 
-    o.driverId === activeDriver.id && ['MATCHED', 'ARRIVING', 'IN_PROGRESS'].includes(o.status)
+    (o.driverId === activeDriver.id || !o.driverId) && 
+    ['MATCHED', 'ARRIVING', 'IN_PROGRESS', 'DRIVER_ASSIGNED', 'DRIVER_COMING', 'DRIVER_ARRIVED', 'TRIP_STARTED'].includes(o.status)
   ) || null;
 
   const toggleOnline = () => {
@@ -252,8 +258,56 @@ export const CaptainApp: React.FC<CaptainAppProps> = ({
             </div>
           </div>
 
+          {/* REAL-TIME PASSENGER & CAPTAIN MESSAGING COCKPIT */}
+          <div className="space-y-2.5 pt-1 border-t border-slate-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-black uppercase tracking-wider text-slate-200">
+                  Passenger Live Messaging Cockpit
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Real-Time Channel Active
+                </span>
+              </div>
+            </div>
+
+            <TripCockpitChat
+              order={currentTrip}
+              driver={activeDriver}
+              currentRole="DRIVER"
+              onSendMessage={(orderId, sender, text) => {
+                if (onSendMessage) {
+                  onSendMessage(orderId, sender, text);
+                } else {
+                  // Fallback to updating order directly
+                  const newMsg = {
+                    id: `msg-${Date.now()}`,
+                    orderId,
+                    sender,
+                    senderName: `${activeDriver.name} (Captain)`,
+                    text,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    createdAtMs: Date.now(),
+                    readByDriver: true,
+                    readByPassenger: false
+                  };
+                  onUpdateOrder(orderId, {
+                    messages: [...(currentTrip.messages || []), newMsg]
+                  });
+                }
+              }}
+              onSwitchCockpitRole={onSwitchToCustomer}
+            />
+          </div>
+
           {/* OTP Verification to start trip */}
-          {currentTrip.status === 'ARRIVING' && (
+          {['ARRIVING', 'DRIVER_ARRIVED', 'DRIVER_COMING', 'DRIVER_ASSIGNED', 'MATCHED'].includes(currentTrip.status) && (
             <div className="bg-blue-950/40 border border-blue-500/30 p-5 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -284,7 +338,7 @@ export const CaptainApp: React.FC<CaptainAppProps> = ({
           )}
 
           {/* In Progress Cockpit */}
-          {currentTrip.status === 'IN_PROGRESS' && (
+          {(currentTrip.status === 'IN_PROGRESS' || currentTrip.status === 'TRIP_STARTED') && (
             <div className="space-y-4">
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
                 <div>
