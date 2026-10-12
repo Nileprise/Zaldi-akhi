@@ -5,7 +5,7 @@ import {
   Settings, HelpCircle, Shield, LogOut, Tag, ArrowRight,
   Share2, Users, Sparkles, Navigation, Calendar, Box,
   Package, User, Briefcase, Laptop, AlertTriangle, Scale,
-  Info, Plus, Minus, AlertCircle, ChevronDown, ChevronUp
+  Info, Plus, Minus, AlertCircle, ChevronDown, ChevronUp, Receipt
 } from 'lucide-react';
 import { 
   CustomerTab, BookingStatus, Driver, RideOrder, VehicleTier, ServiceMode 
@@ -81,6 +81,8 @@ interface CustomerAppProps {
   onUpdateOrder: (orderId: string, updates: Partial<RideOrder>) => void;
   onSendMessage?: (orderId: string, sender: 'PASSENGER' | 'DRIVER', text: string) => void;
   onSwitchToCaptain?: () => void;
+  activeTab?: CustomerTab;
+  onTabChange?: (tab: CustomerTab) => void;
 }
 
 export const CustomerApp: React.FC<CustomerAppProps> = ({
@@ -89,10 +91,24 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   onNewOrder,
   onUpdateOrder,
   onSendMessage,
-  onSwitchToCaptain
+  onSwitchToCaptain,
+  activeTab,
+  onTabChange
 }) => {
   // Navigation & UI state
-  const [customerTab, setCustomerTab] = useState<CustomerTab>('CARPOOL');
+  const [customerTab, setCustomerTabState] = useState<CustomerTab>(activeTab || 'CARPOOL');
+
+  useEffect(() => {
+    if (activeTab && activeTab !== customerTab) {
+      setCustomerTabState(activeTab);
+    }
+  }, [activeTab]);
+
+  const setCustomerTab = (tab: CustomerTab) => {
+    setCustomerTabState(tab);
+    onTabChange?.(tab);
+  };
+
   const [isNightMode, setIsNightMode] = useState(false);
   const [activeInput, setActiveInput] = useState<'pickup' | 'drop' | null>(null);
   const [locationPinType, setLocationPinType] = useState<LocationPinType>('character_pin');
@@ -175,6 +191,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const [showChat, setShowChat] = useState(false);
   const [showCall, setShowCall] = useState(false);
   const [showSafety, setShowSafety] = useState(false);
+  const [showFareBreakdown, setShowFareBreakdown] = useState(false);
 
   // Outstation selected booking modal state
   const [selectedOutstationPkg, setSelectedOutstationPkg] = useState<string | null>(null);
@@ -243,7 +260,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       id: selectedVehicle.id,
       name: isParcel ? `${selectedVehicle.name.split(' ')[0]} Parcel` : selectedVehicle.name,
       capacity: isParcel ? `Max ${parcelSpec.maxWeight} kg` : selectedVehicle.capacity,
-      baseFare: 0,
+      baseFare: 25,
       perKm: 8.0,
       etaMin: selectedVehicle.etaMin,
       icon: isParcel ? '📦' : selectedVehicle.icon,
@@ -279,14 +296,16 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   // Extra luggage fee is removed for bike and auto passenger trips
   const extraLuggageFee = 0;
 
-  // Base trip fare: in ALL bike, auto, cab, zaldi xl, mini truck: distance × per km 8!
-  const baseTripFare = distanceKm > 0 
-    ? Math.round(distanceKm * 8)
+  // Detailed Fare Breakdown Calculation (Base Fare + Distance Charge + Taxes)
+  // All vehicles have base fare ₹25, per-km charge ₹8.00, and 5% statutory GST
+  const baseFareAmount = distanceKm > 0 ? 25 : 0;
+  const distanceChargeAmount = distanceKm > 0 ? Math.round(distanceKm * 8) : 0;
+  const taxAmount = distanceKm > 0 ? Math.max(1, Math.round((baseFareAmount + distanceChargeAmount) * 0.05)) : 0;
+  const grossFare = baseFareAmount + distanceChargeAmount + taxAmount;
+  const rawFare = grossFare;
+  const finalCalculatedFare = distanceKm > 0 
+    ? Math.max(rawFare - discountAmount, 15) 
     : 0;
-
-  // Raw fare
-  const rawFare = baseTripFare;
-  const finalCalculatedFare = Math.max(rawFare - discountAmount, distanceKm > 0 ? 10 : 0);
 
   // Active specs for current vehicle
   const currentParcelSpec = VEHICLE_PARCEL_SPECS[selectedVehicleId] || VEHICLE_PARCEL_SPECS.BIKE;
@@ -764,6 +783,36 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                       </div>
                     )}
 
+                    {/* Prominent Highway Carpool Quick Access Banner */}
+                    <div 
+                      onClick={() => {
+                        sounds.playSuccess();
+                        setCustomerTab('CARPOOL');
+                      }}
+                      className="p-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-900 text-white rounded-2xl shadow-md border border-emerald-500/40 flex items-center justify-between cursor-pointer hover:shadow-lg hover:scale-[1.01] transition group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-lg flex-shrink-0 border border-white/20 shadow-inner">
+                          🚗
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-400 text-slate-950 px-2 py-0.5 rounded-full shadow-2xs">
+                              HIGHWAY CARPOOL
+                            </span>
+                            <span className="text-[10px] text-emerald-200 font-bold">Warangal ⇄ Hyderabad Corridor</span>
+                          </div>
+                          <p className="text-xs font-black text-white mt-0.5 truncate">
+                            Share rides, pick intermediate stops & save up to 70% • From ₹80
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs font-black text-emerald-300 group-hover:translate-x-1 transition flex-shrink-0 pl-2">
+                        <span>Open Hub</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+
                     {/* Vehicle Tier Horizontal Carousel */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs font-bold text-slate-500 whitespace-nowrap py-0.5">
@@ -771,23 +820,40 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                           <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse"></span>
                           <span>18 Captains Active</span>
                         </span>
-                        <span className="flex-shrink-0 text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
-                          <span className="text-slate-700 dark:text-slate-200 font-bold">Est.Dist :</span>
-                          <span className="font-black text-slate-950 dark:text-white">
-                            {pickup && drop && distanceKm > 0 ? `${distanceKm} kms` : '--'}
+                        <div className="flex items-center gap-2">
+                          <span className="flex-shrink-0 text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                            <span className="text-slate-700 dark:text-slate-200 font-bold">Est.Dist :</span>
+                            <span className="font-black text-slate-950 dark:text-white">
+                              {pickup && drop && distanceKm > 0 ? `${distanceKm} kms` : '--'}
+                            </span>
                           </span>
-                        </span>
+                          {pickup && drop && distanceKm > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sounds.playTap();
+                                setShowFareBreakdown(true);
+                              }}
+                              className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-brand-blue border border-blue-200 text-[10px] font-black transition cursor-pointer shadow-2xs"
+                              title="View detailed fare breakdown"
+                            >
+                              <Info className="w-3 h-3 text-brand-blue" />
+                              <span>Fare Breakdown</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1.5 px-0.5">
                         {VEHICLE_OPTIONS.map((v) => {
                           const isSelected = selectedVehicleId === v.id;
 
-                          // Per km rate: exact distance × per km 8 in ALL vehicles (bike, auto, cab, zaldi xl, mini truck)
-                          const effPerKm = 8;
+                          // Consistent Equalized Pricing: Base ₹25 + ₹8.00/km + 5% GST
                           const hasRoute = Boolean(pickup && drop && distanceKm > 0);
+                          const tierDistanceCharge = hasRoute ? Math.round(distanceKm * 8) : 0;
+                          const tierTax = hasRoute ? Math.max(1, Math.round((25 + tierDistanceCharge) * 0.05)) : 0;
                           const tierFare = hasRoute 
-                            ? Math.round(distanceKm * effPerKm)
+                            ? Math.max(25 + tierDistanceCharge + tierTax - discountAmount, 15)
                             : null;
 
                           return (
@@ -833,12 +899,22 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                                 {v.id === 'TRUCK' ? 'Max 750 kg' : v.capacity}
                               </span>
 
-                              {/* Price rate display: only shown when route exists with fare (no empty space before booking) */}
+                              {/* Price rate display: clicking opens detailed fare breakdown */}
                               {hasRoute && tierFare !== null && (
-                                <div className="flex flex-col items-center mt-1.5 pt-1.5 border-t border-slate-100 w-full justify-center animate-in fade-in">
-                                  <span className="font-black text-xs text-slate-900">
+                                <div 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedVehicleId(v.id);
+                                    sounds.playTap();
+                                    setShowFareBreakdown(true);
+                                  }}
+                                  className="flex items-center justify-center gap-1 mt-1.5 pt-1.5 border-t border-slate-100 w-full group/fare hover:text-brand-blue transition"
+                                  title="Click to view detailed fare breakdown"
+                                >
+                                  <span className="font-black text-xs text-slate-900 group-hover/fare:text-brand-blue">
                                     ₹{tierFare}
                                   </span>
+                                  <Info className="w-2.5 h-2.5 text-slate-400 group-hover/fare:text-brand-blue" />
                                 </div>
                               )}
                             </div>
@@ -1181,8 +1257,19 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                           <span className="font-bold truncate max-w-[170px]">{activeOrder.parcelType} ({activeOrder.parcelWeightKg} kg)</span>
                         </div>
                       )}
-                      <div className="flex justify-between font-medium text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-700">
-                        <span>Estimated Fare:</span>
+                      <div className="flex justify-between items-center font-medium text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center gap-1.5">
+                          <span>Estimated Fare:</span>
+                          <button
+                            type="button"
+                            onClick={() => { sounds.playTap(); setShowFareBreakdown(true); }}
+                            className="text-[10px] text-brand-blue font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
+                            title="View detailed fare breakdown"
+                          >
+                            <Info className="w-2.5 h-2.5" />
+                            <span>Breakdown</span>
+                          </button>
+                        </div>
                         <span className="font-black text-emerald-500 text-sm">₹{activeOrder.finalFare}</span>
                       </div>
                     </div>
@@ -1609,6 +1696,15 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                       <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                         Paid via {activeOrder.paymentMethod} • Ref {activeOrder.id}
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => { sounds.playTap(); setShowFareBreakdown(true); }}
+                        className="inline-flex items-center gap-1 text-[11px] font-black text-brand-blue hover:underline pt-1 cursor-pointer"
+                        title="View detailed fare breakdown"
+                      >
+                        <Receipt className="w-3 h-3 text-brand-blue" />
+                        <span>View Detailed Fare Breakdown</span>
+                      </button>
                       {activeOrder.serviceMode === 'PARCEL' && (
                         <div className="text-[10px] text-amber-600 dark:text-amber-400 font-bold pt-0.5">
                           📦 {activeOrder.parcelType} ({activeOrder.parcelWeightKg} kg)
@@ -1994,6 +2090,31 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                 </div>
               </div>
 
+              {/* Itemized Fare Summary Strip with Breakdown Trigger */}
+              {pickup && drop && distanceKm > 0 && (
+                <div 
+                  onClick={() => { sounds.playTap(); setShowFareBreakdown(true); }}
+                  className="flex items-center justify-between px-3 py-1.5 bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200/90 rounded-xl text-xs cursor-pointer transition shadow-2xs group"
+                  title="Click to view full base fare, distance charge & tax breakdown"
+                >
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-700 font-semibold truncate">
+                    <Receipt className="w-3.5 h-3.5 text-brand-blue flex-shrink-0" />
+                    <span>Base ₹{baseFareAmount}</span>
+                    <span className="text-slate-400">+</span>
+                    <span>Dist ₹{distanceChargeAmount}</span>
+                    <span className="text-slate-400">+</span>
+                    <span>Taxes ₹{taxAmount}</span>
+                    {discountAmount > 0 && (
+                      <span className="text-emerald-700 font-bold ml-1">-₹{discountAmount}</span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-black text-brand-blue flex items-center gap-0.5 flex-shrink-0">
+                    <span>Breakdown</span>
+                    <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition" />
+                  </span>
+                </div>
+              )}
+
               {/* Confirm Delivery / Ride / Enter Pickup & Drop Button */}
               <button 
                 onClick={() => {
@@ -2139,6 +2260,195 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
           onClose={() => setShowSafety(false)} 
         />
       )}
+
+      {/* =========================================================================
+          DETAILED FARE BREAKDOWN MODAL (BASE FARE + DISTANCE CHARGE + TAXES)
+         ========================================================================= */}
+      {showFareBreakdown && (() => {
+        const isOrderActive = Boolean(activeOrder);
+        const displayDist = isOrderActive 
+          ? (activeOrder?.distanceKm || distanceKm) 
+          : (distanceKm > 0 ? distanceKm : 0);
+        const displayBase = displayDist > 0 ? 25 : 25;
+        const displayDistCharge = displayDist > 0 ? Math.round(displayDist * 8) : 0;
+        const displayTax = displayDist > 0 
+          ? Math.max(1, Math.round((displayBase + displayDistCharge) * 0.05)) 
+          : 0;
+        const displayGross = displayBase + displayDistCharge + displayTax;
+        const displayDiscount = isOrderActive ? (activeOrder?.discount || 0) : discountAmount;
+        const displayFinal = isOrderActive 
+          ? activeOrder!.finalFare 
+          : (displayDist > 0 ? Math.max(displayGross - displayDiscount, 15) : 25);
+        const displayVehicleName = isOrderActive ? activeOrder!.vehicleTier : activeTierConfig.name;
+        const displayVehicleIcon = isOrderActive ? activeOrder!.vehicleIcon : (currentMode === 'PARCEL' ? '📦' : activeTierConfig.icon);
+        const displayPickup = isOrderActive ? activeOrder!.pickup : (pickup || fixedPinAddress || 'Pickup Point');
+        const displayDrop = isOrderActive ? activeOrder!.drop : (drop || 'Destination Point');
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3.5 sm:p-4 animate-in fade-in overflow-y-auto">
+            <div className="bg-white rounded-3xl w-full max-w-sm p-5 space-y-4 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto no-scrollbar">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-blue-50 text-brand-blue flex items-center justify-center font-black">
+                    <Receipt className="w-5 h-5 text-brand-blue" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm text-slate-900 leading-tight">Detailed Fare Breakdown</h3>
+                    <p className="text-[10px] text-slate-500">Transparent billing • Zero hidden charges</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { sounds.playTap(); setShowFareBreakdown(false); }}
+                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                  title="Close Breakdown"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Route & Vehicle Context Card */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{displayVehicleIcon}</span>
+                    <div>
+                      <span className="font-black text-xs text-slate-900 block leading-tight">{displayVehicleName}</span>
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        {currentMode === 'PARCEL' ? 'Cargo Transport' : 'Passenger Ride'}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-blue-100 text-brand-blue text-[10px] font-black font-mono">
+                    {displayDist > 0 ? `${displayDist} km` : 'Rate Preview'}
+                  </span>
+                </div>
+
+                <div className="space-y-1 text-[11px] pt-1.5 border-t border-slate-200/70">
+                  <div className="flex items-center gap-1.5 text-slate-700 truncate font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                    <span className="truncate">{displayPickup}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-700 truncate font-medium">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0"></span>
+                    <span className="truncate">{displayDrop}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Itemized Calculation Breakdown */}
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Trip Fare Calculation
+                </span>
+
+                {/* 1. Base Fare */}
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/80">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      <span className="text-xs font-black text-slate-900">Base Fare</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">Vehicle dispatch & initial boarding flag fall</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-black text-xs text-slate-900 font-mono">₹{displayBase}</span>
+                    <span className="block text-[9px] text-slate-400">Fixed</span>
+                  </div>
+                </div>
+
+                {/* 2. Distance Charge */}
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/80">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                      <span className="text-xs font-black text-slate-900">Distance Charge</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      {displayDist > 0 ? `${displayDist} km × ₹8.00 / km actual road route` : 'Standard rate: ₹8.00 per km'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-black text-xs text-slate-900 font-mono">₹{displayDistCharge}</span>
+                    <span className="block text-[9px] text-slate-400">@ ₹8/km</span>
+                  </div>
+                </div>
+
+                {/* 3. Taxes & Statutory Fees */}
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/80">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      <span className="text-xs font-black text-slate-900">Taxes & Statutory Fees</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">Government GST (5% Passenger Transport Cess)</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-black text-xs text-slate-900 font-mono">₹{displayTax}</span>
+                    <span className="block text-[9px] text-slate-400">5% GST</span>
+                  </div>
+                </div>
+
+                {/* Subtotal row */}
+                <div className="flex items-center justify-between px-2.5 py-1 text-xs text-slate-500">
+                  <span>Gross Total (Base + Dist + Taxes)</span>
+                  <span className="font-bold text-slate-700">₹{displayGross}</span>
+                </div>
+
+                {/* 4. Promo Discount (if applied) */}
+                {displayDiscount > 0 && (
+                  <div className="flex items-center justify-between p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-xs font-black text-emerald-800">
+                          Promo Discount {promoCode ? `(${promoCode})` : ''}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-emerald-700">Applied coupon savings</p>
+                    </div>
+                    <span className="font-black text-xs text-emerald-700 font-mono">-₹{displayDiscount}</span>
+                  </div>
+                )}
+
+                {/* 5. Final Calculated Fare Card */}
+                <div className="p-3 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl flex items-center justify-between shadow-md">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block">Final Fare Payable</span>
+                    <span className="text-[10px] text-emerald-400 font-semibold">
+                      Via {isOrderActive ? activeOrder!.paymentMethod : paymentMethod} • All inclusive
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-emerald-400 font-mono">₹{displayFinal}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fair Pricing Guarantee Callout */}
+              <div className="p-2.5 bg-blue-50/70 rounded-xl border border-blue-200/70 space-y-1 text-[10px] text-slate-600">
+                <div className="flex items-center gap-1.5 font-bold text-brand-blue">
+                  <ShieldCheck className="w-3.5 h-3.5 text-brand-blue flex-shrink-0" />
+                  <span>Transparent Pricing Guarantee</span>
+                </div>
+                <p className="leading-relaxed">
+                  Bike, Auto, Cab, XL and Mini Truck all share uniform ₹8/km road network pricing and ₹25 base flag fall. No peak surge multipliers or unexpected waiting fees.
+                </p>
+              </div>
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => { sounds.playTap(); setShowFareBreakdown(false); }}
+                className="w-full py-3 bg-[#00875A] hover:bg-[#00704A] text-white rounded-2xl font-black text-xs shadow-md shadow-emerald-700/20 transition cursor-pointer"
+              >
+                Understood • Close Breakdown
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

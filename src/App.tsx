@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  AppRole, Driver, RideOrder, TripMessage 
+  AppRole, Driver, RideOrder, TripMessage, CustomerTab 
 } from './types';
 import { INITIAL_DRIVERS } from './services/mockData';
 import { CustomerApp } from './components/CustomerApp';
@@ -18,12 +18,13 @@ import { tripChatBroadcaster } from './services/tripChatService';
 import { 
   Smartphone, UserCheck, Shield, Sparkles, 
   Volume2, Car, Bell, ExternalLink, KeyRound, LogOut, ArrowLeft,
-  Radio, Building2
+  Radio, Building2, Users
 } from 'lucide-react';
 import { PartnerAuthModal } from './components/PartnerAuthModal';
 
 export default function App() {
   const [activeApp, setActiveApp] = useState<AppRole>('CUSTOMER_APP');
+  const [customerSubTab, setCustomerSubTab] = useState<CustomerTab>('CARPOOL');
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [authenticatedRole, setAuthenticatedRole] = useState<AppRole | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>(INITIAL_DRIVERS);
@@ -156,15 +157,33 @@ export default function App() {
               onClick={() => {
                 sounds.playPop();
                 setActiveApp('CUSTOMER_APP');
+                setCustomerSubTab('BOOKING');
               }}
               className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
-                activeApp === 'CUSTOMER_APP' 
+                activeApp === 'CUSTOMER_APP' && customerSubTab === 'BOOKING'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-black' 
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Car className="w-3.5 h-3.5" />
               <span>Ride Booking</span>
+            </button>
+
+            <button
+              onClick={() => {
+                sounds.playSuccess();
+                setActiveApp('CUSTOMER_APP');
+                setCustomerSubTab('CARPOOL');
+              }}
+              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+                activeApp === 'CUSTOMER_APP' && customerSubTab === 'CARPOOL'
+                  ? 'bg-[#00875A] text-white shadow-md shadow-emerald-700/30 font-black' 
+                  : 'text-slate-700 hover:text-slate-900'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Highway Carpooling</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             </button>
 
             <button
@@ -239,15 +258,32 @@ export default function App() {
           onClick={() => {
             sounds.playPop();
             setActiveApp('CUSTOMER_APP');
+            setCustomerSubTab('BOOKING');
           }}
           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 ${
-            activeApp === 'CUSTOMER_APP' 
+            activeApp === 'CUSTOMER_APP' && customerSubTab === 'BOOKING'
               ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <Car className="w-3.5 h-3.5" />
           <span>Ride Booking</span>
+        </button>
+
+        <button
+          onClick={() => {
+            sounds.playSuccess();
+            setActiveApp('CUSTOMER_APP');
+            setCustomerSubTab('CARPOOL');
+          }}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 ${
+            activeApp === 'CUSTOMER_APP' && customerSubTab === 'CARPOOL'
+              ? 'bg-[#00875A] text-white font-black shadow-md shadow-emerald-700/30' 
+              : 'text-slate-700 hover:text-slate-900'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Carpool Hub</span>
         </button>
 
         <button
@@ -351,6 +387,8 @@ export default function App() {
             onNewOrder={handleNewOrder}
             onUpdateOrder={handleUpdateOrder}
             onSendMessage={handleSendMessage}
+            activeTab={customerSubTab}
+            onTabChange={setCustomerSubTab}
             onSwitchToCaptain={() => {
               setAuthenticatedRole('DRIVER_APP');
               setActiveApp('DRIVER_APP');
