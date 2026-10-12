@@ -30,38 +30,38 @@ import {
 import { tripChatBroadcaster } from '../services/tripChatService';
 
 // Parcel Specifications across all vehicle tiers
-const VEHICLE_PARCEL_SPECS: Record<string, { maxWeight: number; types: { label: string; icon: string }[] }> = {
+const VEHICLE_PARCEL_SPECS: Record<string, { maxWeight: number; types: { label: string; icon: string; desc?: string }[] }> = {
   BIKE: {
     maxWeight: 20,
     types: [
-      { label: 'Documents & Envelopes', icon: '📄' },
-      { label: 'Food & Groceries', icon: '🍱' },
-      { label: 'Clothes & Small Box', icon: '👕' },
-      { label: 'Electronics & Gadgets', icon: '📱' },
-      { label: 'Medicines & Urgent Items', icon: '💊' },
-      { label: 'Small Box / Gift Parcel', icon: '📦' }
+      { label: 'Documents & Envelopes', icon: '📄', desc: 'Papers, certificates & files' },
+      { label: 'Food & Groceries', icon: '🍱', desc: 'Tiffin, takeaway & packed food' },
+      { label: 'Clothes & Small Box', icon: '👕', desc: 'Apparel, shoes & gifts' },
+      { label: 'Electronics & Gadgets', icon: '📱', desc: 'Phones, chargers & gadgets' },
+      { label: 'Medicines & Urgent Items', icon: '💊', desc: 'Prescriptions & emergency care' },
+      { label: 'Small Box / Gift Parcel', icon: '📦', desc: 'Compact parcels & pouches' }
     ]
   },
   AUTO: {
     maxWeight: 100,
     types: [
-      { label: 'Cartons & Medium Boxes', icon: '📦' },
-      { label: 'Home Appliances & TV', icon: '📺' },
-      { label: 'Catering & Bulk Food', icon: '🍲' },
-      { label: 'Retail & Commercial Stock', icon: '🛍️' },
-      { label: 'Tools & Hardware', icon: '🧰' },
-      { label: 'Bulk Freight (up to 100kg)', icon: '📦' }
+      { label: 'Cartons & Medium Boxes', icon: '📦', desc: 'Corrugated cartons & storage boxes' },
+      { label: 'Home Appliances & TV', icon: '📺', desc: 'Microwaves, TVs & electronics' },
+      { label: 'Catering & Bulk Food', icon: '🍲', desc: 'Catering vessels & event food' },
+      { label: 'Retail & Commercial Stock', icon: '🛍️', desc: 'Inventory & boutique parcels' },
+      { label: 'Tools & Hardware', icon: '🧰', desc: 'Machinery tools & supplies' },
+      { label: 'Bulk Freight (up to 100kg)', icon: '📦', desc: 'Heavy boxes & medium freight' }
     ]
   },
   TRUCK: {
     maxWeight: 750,
     types: [
-      { label: 'Commercial Cargo & Freight', icon: '🚛' },
-      { label: 'Pallets & Warehouse Stock', icon: '📦' },
-      { label: 'Home Furniture & Relocation', icon: '🛋️' },
-      { label: 'Industrial Hardware & Tools', icon: '⚙️' },
-      { label: 'Construction Materials', icon: '🧱' },
-      { label: 'Mini Truck Full Load (up to 750kg)', icon: '🚚' }
+      { label: 'Commercial Cargo & Freight', icon: '🚛', desc: 'Wholesale goods & industrial cargo' },
+      { label: 'Pallets & Warehouse Stock', icon: '📦', desc: 'Palletized goods & distribution' },
+      { label: 'Home Furniture & Relocation', icon: '🛋️', desc: 'Sofas, beds & house shifting' },
+      { label: 'Industrial Hardware & Tools', icon: '⚙️', desc: 'Heavy engineering equipment' },
+      { label: 'Construction Materials', icon: '🧱', desc: 'Cement bags, tiles & paints' },
+      { label: 'Mini Truck Full Load (up to 750kg)', icon: '🚚', desc: 'Full vehicle load transportation' }
     ]
   }
 };
@@ -92,7 +92,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   onSwitchToCaptain
 }) => {
   // Navigation & UI state
-  const [customerTab, setCustomerTab] = useState<CustomerTab>('BOOKING');
+  const [customerTab, setCustomerTab] = useState<CustomerTab>('CARPOOL');
   const [isNightMode, setIsNightMode] = useState(false);
   const [activeInput, setActiveInput] = useState<'pickup' | 'drop' | null>(null);
   const [locationPinType, setLocationPinType] = useState<LocationPinType>('character_pin');
@@ -294,7 +294,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const currentParcelType = parcelTypes[selectedVehicleId] || currentParcelSpec.types[0].label;
   const currentParcelItem = currentParcelSpec.types.find(t => t.label === currentParcelType) || {
     label: currentParcelType,
-    icon: '📦'
+    icon: '📦',
+    desc: 'Custom cargo / parcel item'
   };
   const currentSeatSpec = VEHICLE_MAX_SEATS[selectedVehicleId] || VEHICLE_MAX_SEATS.BIKE;
   const currentPassengers = passengersByVehicle[selectedVehicleId] || 1;
@@ -480,9 +481,9 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const getSheetHeight = () => {
     if (customerTab === 'CARPOOL') {
       if (isCarpoolMapFocused) return '170px';
-      return '80%';
+      return 'auto';
     }
-    if (!isHomeTab) return '80%';
+    if (!isHomeTab) return 'auto';
     if (activeOrder) {
       if (['FINDING_DRIVER', 'SEARCHING'].includes(activeOrder.status)) return '370px';
       if (['DRIVER_ASSIGNED', 'DRIVER_COMING'].includes(activeOrder.status)) return '440px';
@@ -491,8 +492,9 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       if (['TRIP_COMPLETED', 'COMPLETED'].includes(activeOrder.status)) return '540px';
     }
     if (activeInput && suggestions.length > 0) return '75%';
-    if (pickup && drop) return '74%';
-    return '58%';
+
+    // Auto-adjust height so there is no empty space between content and bottom nav
+    return 'auto';
   };
 
   return (
@@ -501,11 +503,48 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       {/* Phone Mockup Frame */}
       <div className="relative w-full max-w-[420px] h-[870px] bg-white text-slate-900 shadow-2xl rounded-[3rem] border-[10px] border-slate-100 flex flex-col font-sans overflow-hidden ring-1 ring-slate-200">
         
+        {/* Full-bleed Carpool Experience (Matching 5-screen mockup exactly) */}
+        {customerTab === 'CARPOOL' && (
+          <div className="absolute inset-0 z-40 bg-white flex flex-col overflow-hidden">
+            <CarpoolSection
+              currentAddress={pickup || fixedPinAddress || 'Hanamkonda, Warangal'}
+              walletBalance={walletBalance}
+              passengerDestination={drop || 'Hyderabad'}
+              onDeductFare={(amt) => setWalletBalance(prev => Math.max(0, prev - amt))}
+              onDriverChange={(driver, pos) => {
+                setActiveCarpoolDriver(driver);
+                setActiveCarpoolDriverPos(pos);
+              }}
+              onViewRouteOnMap={(driver) => {
+                setActiveCarpoolDriver(driver);
+                setIsCarpoolMapFocused(true);
+                sounds.playPop();
+              }}
+              isMapFocused={isCarpoolMapFocused}
+              onToggleMapFocus={() => setIsCarpoolMapFocused(prev => !prev)}
+              onUpdatePickupLocation={(newAddr) => {
+                setPickup(newAddr);
+                setFixedPinAddress(newAddr);
+              }}
+              onSelectDropoffLocation={(newDrop) => {
+                setDrop(newDrop);
+              }}
+              onBookCarpoolSuccess={(poolId) => {
+                setJoinedPoolId(poolId);
+              }}
+              onSwitchTab={(tab) => {
+                setCustomerTab(tab);
+                sounds.playPop();
+              }}
+            />
+          </div>
+        )}
+
         {/* Map Background Area (Top 55-60%, expands when viewing carpool route) */}
         <div className={`absolute top-0 left-0 right-0 ${customerTab === 'CARPOOL' && isCarpoolMapFocused ? 'h-[78%]' : 'h-[62%]'} z-0 overflow-hidden transition-all duration-300`}>
           <InteractiveMap
-            pickup={pickup}
-            drop={drop}
+            pickup={pickup || (customerTab === 'CARPOOL' ? 'Hanamkonda Bus Terminal' : (fixedPinAddress || DEFAULT_GPS_ADDRESS))}
+            drop={drop || (customerTab === 'CARPOOL' ? 'Hyderabad' : '')}
             status={activeOrder?.status || 'IDLE'}
             progressPercent={activeOrder?.progressPercent || 0}
             vehicleTierName={activeOrder?.vehicleTier || activeTierConfig.name}
@@ -515,7 +554,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             driverPlate={currentDriver.plate}
             isNightMode={isNightMode}
             onToggleNightMode={() => setIsNightMode(!isNightMode)}
-            showFixedPin={showFixedPin && customerTab !== 'CARPOOL'}
+            showFixedPin={showFixedPin && !drop && !isCarpoolMapFocused && !joinedPoolId && customerTab !== 'CARPOOL'}
             fixedPinAddress={fixedPinAddress}
             fixedPinPos={fixedPinPos}
             onAddressResolved={handleAddressResolved}
@@ -602,13 +641,13 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
         {/* Bottom Sheet Drawer */}
         <div 
-          className={`absolute w-full bg-white rounded-t-3xl shadow-[0_-15px_40px_rgba(0,0,0,0.1)] border-t border-slate-100 transition-all duration-300 ease-in-out z-30 flex flex-col`}
+          className={`absolute w-full bg-white rounded-t-3xl shadow-[0_-15px_40px_rgba(0,0,0,0.1)] border-t border-slate-100 transition-all duration-300 ease-in-out z-30 flex flex-col max-h-[82%]`}
           style={{ height: getSheetHeight(), bottom: '70px' }}
         >
           {/* Pull Handle */}
-          <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 mb-2 flex-shrink-0 cursor-pointer"></div>
+          <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-2.5 mb-1.5 flex-shrink-0 cursor-pointer"></div>
 
-          <div ref={drawerScrollRef} className="flex-1 overflow-y-auto px-5 pb-6 no-scrollbar relative text-slate-900">
+          <div ref={drawerScrollRef} className={`flex-1 min-h-0 overflow-y-auto px-5 no-scrollbar relative text-slate-900 ${(selectedVehicleId === 'CAB' || selectedVehicleId === 'PREMIUM' || ((selectedVehicleId === 'BIKE' || selectedVehicleId === 'AUTO') && currentMode === 'PERSON') || customerTab === 'CARPOOL') ? 'pb-2' : 'pb-6'}`}>
             
             {/* =========================================
                 1. BOOKING TAB
@@ -629,8 +668,14 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                             type="text" 
                             value={drop}
                             onChange={(e) => {
-                              setDrop(e.target.value);
-                              setSearchQuery(e.target.value);
+                              const val = e.target.value;
+                              setDrop(val);
+                              setSearchQuery(val);
+                              const effP = pickup || fixedPinAddress || DEFAULT_GPS_ADDRESS;
+                              if (!pickup && val.trim()) {
+                                setPickup(effP);
+                              }
+                              recalcDistance(pickup || effP, val);
                             }}
                             onFocus={() => {
                               setActiveInput('drop');
@@ -649,6 +694,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                               onClick={() => {
                                 sounds.playPop();
                                 setDrop('');
+                                recalcDistance(pickup, '');
                                 dropInputRef.current?.focus();
                               }} 
                               title="Clear Drop"
@@ -704,8 +750,10 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                           <button
                             key={loc.id}
                             onClick={() => {
+                              const effPickup = pickup || fixedPinAddress || DEFAULT_GPS_ADDRESS;
+                              if (!pickup) setPickup(effPickup);
                               setDrop(loc.name);
-                              if (pickup) recalcDistance(pickup, loc.name);
+                              recalcDistance(effPickup, loc.name);
                             }}
                             className="flex-shrink-0 px-3 py-1.5 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-[11px] font-semibold text-slate-700 transition flex items-center gap-1.5 shadow-xs"
                           >
@@ -718,17 +766,17 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
                     {/* Vehicle Tier Horizontal Carousel */}
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-900 dark:text-white font-black">Select Vehicle & Services</span>
-                          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 text-[10px] font-black border border-cyan-500/20">
-                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse"></span>
-                            <span>18 Captains Active</span>
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-500 whitespace-nowrap py-0.5">
+                        <span className="flex-shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 text-[10px] font-black border border-cyan-500/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse"></span>
+                          <span>18 Captains Active</span>
+                        </span>
+                        <span className="flex-shrink-0 text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                          <span className="text-slate-700 dark:text-slate-200 font-bold">Est.Dist :</span>
+                          <span className="font-black text-slate-950 dark:text-white">
+                            {pickup && drop && distanceKm > 0 ? `${distanceKm} kms` : '--'}
                           </span>
-                        </div>
-                        {Boolean(pickup && drop && distanceKm > 0) && (
-                          <span className="text-slate-600 font-bold">Est. Distance: {distanceKm} km</span>
-                        )}
+                        </span>
                       </div>
 
                       <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1.5 px-0.5">
@@ -785,14 +833,14 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                                 {v.id === 'TRUCK' ? 'Max 750 kg' : v.capacity}
                               </span>
 
-                              {/* Price rate display: empty without price when pickup/drop not entered; NO time like 6 mins below rate */}
-                              <div className="flex flex-col items-center mt-1.5 pt-1.5 border-t border-slate-100 w-full min-h-[20px] justify-center">
-                                {hasRoute && tierFare !== null ? (
+                              {/* Price rate display: only shown when route exists with fare (no empty space before booking) */}
+                              {hasRoute && tierFare !== null && (
+                                <div className="flex flex-col items-center mt-1.5 pt-1.5 border-t border-slate-100 w-full justify-center animate-in fade-in">
                                   <span className="font-black text-xs text-slate-900">
                                     ₹{tierFare}
                                   </span>
-                                ) : null}
-                              </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -817,13 +865,13 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
                           {selectedVehicleId === 'TRUCK' ? (
                             // For Mini Truck: strictly dedicated to Commercial Cargo / Freight
-                            <div className="bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/30 flex items-center gap-1.5 text-xs font-black text-amber-700 dark:text-amber-300">
+                            <div className="bg-white px-3 py-1.5 rounded-xl border border-amber-300/80 shadow-xs flex items-center gap-1.5 text-xs font-black text-amber-700 dark:text-amber-300">
                               <Package className="w-3.5 h-3.5 text-amber-500" />
                               <span>Cargo Freight & Transport (Max 750 kg)</span>
                             </div>
                           ) : (
                             // For Bike Moto and Auto 3W: Both Ride and Transport services available
-                            <div className="bg-slate-100 p-0.5 rounded-xl flex items-center gap-1 border border-slate-200 flex-shrink-0">
+                            <div className="bg-white p-0.5 rounded-xl flex items-center gap-1 border border-slate-200 flex-shrink-0 shadow-xs">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -866,19 +914,27 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                       {currentMode === 'PARCEL' && (
                         <div className="space-y-3 pt-1 border-t border-slate-200/80 dark:border-slate-700/60">
                           {/* Type of Parcel / Cargo Dropdown Selector */}
-                          <div className="space-y-1.5 relative">
+                          <div className="space-y-2 bg-white dark:bg-slate-900/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xs relative">
                             <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-300">
                               <span className="flex items-center gap-1">
                                 <Package className="w-3.5 h-3.5 text-amber-500" />
                                 <span>Type of Parcel / Cargo:</span>
                               </span>
-                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-white px-2 py-0.5 rounded-full border border-amber-300 shadow-xs">
                                 {currentParcelSpec.types.length} Types
                               </span>
                             </div>
 
                             {/* Dropdown Container */}
                             <div className="relative">
+                              {/* Backdrop to close dropdown on click outside */}
+                              {isParcelDropdownOpen && (
+                                <div 
+                                  className="fixed inset-0 z-30" 
+                                  onClick={() => setIsParcelDropdownOpen(false)} 
+                                />
+                              )}
+
                               {/* Dropdown Trigger Button */}
                               <button
                                 type="button"
@@ -886,14 +942,14 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                                   sounds.playTap();
                                   setIsParcelDropdownOpen(!isParcelDropdownOpen);
                                 }}
-                                className={`w-full p-2.5 sm:p-3 rounded-2xl border-2 transition flex items-center justify-between gap-2 shadow-xs text-left ${
+                                className={`w-full p-2.5 sm:p-3 rounded-2xl border-2 transition flex items-center justify-between gap-2 shadow-xs text-left relative z-30 ${
                                   isParcelDropdownOpen
-                                    ? 'bg-amber-50/50 dark:bg-amber-950/30 border-amber-500 ring-2 ring-amber-500/20'
-                                    : 'bg-slate-50 hover:bg-slate-100/90 dark:bg-slate-900/90 border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                                    ? 'bg-white dark:bg-slate-900 border-amber-500 ring-2 ring-amber-500/20'
+                                    : 'bg-white hover:bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-amber-400'
                                 }`}
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center text-base flex-shrink-0 shadow-2xs">
+                                  <div className="w-8 h-8 rounded-xl bg-white border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center text-base flex-shrink-0 shadow-xs">
                                     {currentParcelItem.icon}
                                   </div>
                                   <div className="min-w-0">
@@ -905,14 +961,19 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                                     <div className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
                                       {currentParcelType}
                                     </div>
+                                    {currentParcelItem.desc && (
+                                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                        {currentParcelItem.desc}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
 
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                  <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-extrabold text-[10px] hidden xs:inline-block">
+                                  <span className="px-2 py-0.5 rounded-md bg-white border border-amber-300 text-amber-700 dark:text-amber-300 font-extrabold text-[10px] hidden xs:inline-block shadow-xs">
                                     {isParcelDropdownOpen ? 'Close' : 'Select'}
                                   </span>
-                                  <div className="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500">
+                                  <div className="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 shadow-xs">
                                     {isParcelDropdownOpen ? (
                                       <ChevronUp className="w-4 h-4 text-amber-500" />
                                     ) : (
@@ -922,31 +983,11 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                                 </div>
                               </button>
 
-                              {/* Native Select Alternative (Synchronized & accessible) */}
-                              <div className="mt-1 flex items-center justify-between px-1 text-[10px] text-slate-400">
-                                <span>Quick drop-down:</span>
-                                <select
-                                  value={currentParcelType}
-                                  onChange={(e) => {
-                                    sounds.playPop();
-                                    setParcelTypes(prev => ({ ...prev, [selectedVehicleId]: e.target.value }));
-                                    setIsParcelDropdownOpen(false);
-                                  }}
-                                  className="bg-transparent text-amber-600 dark:text-amber-400 font-bold outline-none cursor-pointer hover:underline text-[10px]"
-                                >
-                                  {currentParcelSpec.types.map(pt => (
-                                    <option key={pt.label} value={pt.label} className="text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 font-semibold">
-                                      {pt.icon} {pt.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* Custom Dropdown Menu with Icons and Categories */}
+                              {/* Custom Dropdown Menu with Details and Options */}
                               {isParcelDropdownOpen && (
-                                <div className="absolute top-[102%] left-0 right-0 bg-white dark:bg-slate-900 border-2 border-amber-500/50 rounded-2xl shadow-2xl p-1.5 z-50 max-h-56 overflow-y-auto space-y-1 animate-in fade-in zoom-in-98 divide-y divide-slate-100 dark:divide-slate-800 backdrop-blur-md">
+                                <div className="absolute top-[102%] left-0 right-0 bg-white dark:bg-slate-900 border-2 border-amber-500/50 rounded-2xl shadow-2xl p-1.5 z-50 max-h-64 overflow-y-auto space-y-1 animate-in fade-in zoom-in-98 divide-y divide-slate-100 dark:divide-slate-800 backdrop-blur-md">
                                   <div className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                                    <span>Choose Type of Parcel</span>
+                                    <span>Select Parcel Type</span>
                                     <span className="text-amber-600 dark:text-amber-400 font-bold">Max {currentParcelSpec.maxWeight} kg</span>
                                   </div>
 
@@ -971,7 +1012,14 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                                             <span className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-sm flex-shrink-0">
                                               {pt.icon}
                                             </span>
-                                            <span className="text-xs truncate">{pt.label}</span>
+                                            <div className="min-w-0">
+                                              <span className="text-xs truncate block">{pt.label}</span>
+                                              {pt.desc && (
+                                                <span className="text-[10px] text-slate-400 font-normal truncate block">
+                                                  {pt.desc}
+                                                </span>
+                                              )}
+                                            </div>
                                           </div>
                                           {isSelected ? (
                                             <Check className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
@@ -985,7 +1033,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
                                   {/* Custom Parcel Input */}
                                   <div className="pt-2 px-1">
-                                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
                                       <input
                                         type="text"
                                         value={customParcelInput}
@@ -1022,134 +1070,86 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                             </div>
                           </div>
 
-                          {/* Weight Selector & Limit Validation */}
-                          <div className="space-y-2 bg-white dark:bg-slate-900/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-white">
-                                <Scale className="w-3.5 h-3.5 text-amber-500" />
-                                <span>Weight:</span>
+                          {/* Weight Selector & Limit Validation (Deleted for Bike) */}
+                          {selectedVehicleId !== 'BIKE' && (
+                            <div className="space-y-2 bg-white dark:bg-slate-900/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xs">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-white">
+                                  <Scale className="w-3.5 h-3.5 text-amber-500" />
+                                  <span>Weight:</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-base font-black text-slate-900 dark:text-white">
+                                    {currentParcelWeight} kg
+                                  </span>
+                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                    currentParcelWeight > currentParcelSpec.maxWeight
+                                      ? 'bg-white text-rose-600 border border-rose-400 shadow-xs animate-pulse'
+                                      : 'bg-white text-emerald-600 border border-emerald-400 shadow-xs'
+                                  }`}>
+                                    Limit: Max {currentParcelSpec.maxWeight} kg
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-base font-black text-slate-900 dark:text-white">
-                                  {currentParcelWeight} kg
-                                </span>
-                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                                  currentParcelWeight > currentParcelSpec.maxWeight
-                                    ? 'bg-rose-500/20 text-rose-500 border border-rose-500/40 animate-pulse'
-                                    : 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/40'
-                                }`}>
-                                  Limit: Max {currentParcelSpec.maxWeight} kg
-                                </span>
+
+                              {/* Stepper (+ increase only one, - decrease only one) */}
+                              <div className="flex items-center gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    sounds.playPop();
+                                    setParcelWeights(prev => ({
+                                      ...prev,
+                                      [selectedVehicleId]: Math.max(1, (prev[selectedVehicleId] || 1) - 1)
+                                    }));
+                                  }}
+                                  disabled={currentParcelWeight <= 1}
+                                  className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-slate-700 dark:text-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition shadow-xs"
+                                  title="Decrease only one kg (-1)"
+                                >
+                                  <Minus className="w-3.5 h-3.5" />
+                                </button>
+
+                                <input 
+                                  type="range"
+                                  min={1}
+                                  max={currentParcelSpec.maxWeight}
+                                  step={1}
+                                  value={currentParcelWeight}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    setParcelWeights(prev => ({
+                                      ...prev,
+                                      [selectedVehicleId]: Math.min(currentParcelSpec.maxWeight, Math.max(1, val))
+                                    }));
+                                  }}
+                                  className="flex-1 accent-amber-500 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    sounds.playPop();
+                                    setParcelWeights(prev => ({
+                                      ...prev,
+                                      [selectedVehicleId]: Math.min(currentParcelSpec.maxWeight, (prev[selectedVehicleId] || 1) + 1)
+                                    }));
+                                  }}
+                                  disabled={currentParcelWeight >= currentParcelSpec.maxWeight}
+                                  className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-slate-700 dark:text-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition shadow-xs"
+                                  title="Increase only one kg (+1)"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </div>
-
-                            {/* Stepper (+ increase only one, - decrease only one) */}
-                            <div className="flex items-center gap-2 pt-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  sounds.playPop();
-                                  setParcelWeights(prev => ({
-                                    ...prev,
-                                    [selectedVehicleId]: Math.max(1, (prev[selectedVehicleId] || 1) - 1)
-                                  }));
-                                }}
-                                disabled={currentParcelWeight <= 1}
-                                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-slate-700 dark:text-slate-300 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition"
-                                title="Decrease only one kg (-1)"
-                              >
-                                <Minus className="w-3.5 h-3.5" />
-                              </button>
-
-                              <input 
-                                type="range"
-                                min={1}
-                                max={currentParcelSpec.maxWeight}
-                                step={1}
-                                value={currentParcelWeight}
-                                onChange={(e) => {
-                                  const val = Number(e.target.value);
-                                  setParcelWeights(prev => ({
-                                    ...prev,
-                                    [selectedVehicleId]: Math.min(currentParcelSpec.maxWeight, Math.max(1, val))
-                                  }));
-                                }}
-                                className="flex-1 accent-amber-500 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
-                              />
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  sounds.playPop();
-                                  setParcelWeights(prev => ({
-                                    ...prev,
-                                    [selectedVehicleId]: Math.min(currentParcelSpec.maxWeight, (prev[selectedVehicleId] || 1) + 1)
-                                  }));
-                                }}
-                                disabled={currentParcelWeight >= currentParcelSpec.maxWeight}
-                                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-slate-700 dark:text-slate-300 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition"
-                                title="Increase only one kg (+1)"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
+                          )}
                         </div>
                       )}
 
                       {/* Person mode has no baggage policy or luggage fee */}
                     </div>
                   )}
-
-                    {/* Promo Code & Payment Summary */}
-                    {pickup && drop && (
-                      <div className="space-y-3 pt-1 animate-in fade-in">
-                        {/* Promo Coupon Box */}
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <Tag className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                            <input 
-                              type="text"
-                              value={promoCode}
-                              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                              placeholder="Coupon (e.g. ZALDI50)"
-                              className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-white uppercase placeholder-slate-400 outline-none"
-                            />
-                          </div>
-                          <button
-                            onClick={handleApplyPromo}
-                            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition"
-                          >
-                            Apply
-                          </button>
-                        </div>
-                        {promoMessage && (
-                          <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                            {promoMessage}
-                          </div>
-                        )}
-
-                        {/* Payment Method Selector */}
-                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs">
-                          <span className="font-semibold text-slate-500">Payment:</span>
-                          <div className="flex gap-1.5">
-                            {(['WALLET', 'UPI', 'CASH'] as const).map(pm => (
-                              <button
-                                key={pm}
-                                onClick={() => setPaymentMethod(pm)}
-                                className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition ${
-                                  paymentMethod === pm
-                                    ? 'bg-brand-blue text-white shadow'
-                                    : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                                }`}
-                              >
-                                {pm === 'WALLET' ? `Wallet (₹${walletBalance})` : pm}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
                   </div>
                 )}
@@ -1683,8 +1683,9 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                ========================================= */}
             {customerTab === 'CARPOOL' && (
               <CarpoolSection
-                currentAddress={pickup || fixedPinAddress}
+                currentAddress={pickup || fixedPinAddress || 'Hanamkonda Bus Terminal'}
                 walletBalance={walletBalance}
+                passengerDestination={drop || 'Hyderabad'}
                 onDeductFare={(amt) => setWalletBalance(prev => Math.max(0, prev - amt))}
                 onDriverChange={(driver, pos) => {
                   setActiveCarpoolDriver(driver);
@@ -1697,6 +1698,16 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                 }}
                 isMapFocused={isCarpoolMapFocused}
                 onToggleMapFocus={() => setIsCarpoolMapFocused(prev => !prev)}
+                onUpdatePickupLocation={(newAddr) => {
+                  setPickup(newAddr);
+                  setFixedPinAddress(newAddr);
+                }}
+                onSelectDropoffLocation={(newDrop) => {
+                  setDrop(newDrop);
+                }}
+                onBookCarpoolSuccess={(poolId) => {
+                  setJoinedPoolId(poolId);
+                }}
               />
             )}
 
@@ -1932,26 +1943,58 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
           </div>
 
           {/* ====================================================
-              FIXED "ENTER PICKUP & DROP" ACTION BAR
+              FIXED ACTION BAR (COUPON, PAYMENT & CONFIRM BUTTON)
               Fixed directly above div:nth-of-type(3) (Bottom Navigation Bar)
              ==================================================== */}
           {customerTab === 'BOOKING' && !activeOrder && (
-            <div className="p-3 bg-white/98 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-6px_25px_rgba(0,0,0,0.08)] z-30 flex-shrink-0">
-              {pickup && drop && (
-                <div className="flex items-center justify-between px-1 mb-2 text-[11px] font-bold text-slate-500">
-                  <div className="flex items-center gap-1.5 truncate max-w-[220px]">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></span>
-                    <span className="truncate text-slate-700">{pickup.split(',')[0]}</span>
-                    <span className="text-slate-300">→</span>
-                    <span className="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0"></span>
-                    <span className="truncate text-slate-900 font-extrabold">{drop.split(',')[0]}</span>
-                  </div>
-                  <span className="text-emerald-600 font-extrabold flex-shrink-0">
-                    {distanceKm} km • {activeTierConfig.etaMin}m away
-                  </span>
+            <div className="p-3 bg-white/98 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.1)] z-30 flex-shrink-0 space-y-2">
+              {/* Promo Coupon Box (Always Visible & Accessible) */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Tag className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input 
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    placeholder="Coupon (e.g. ZALDI50)"
+                    className="w-full pl-8 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 uppercase placeholder-slate-400 outline-none focus:border-brand-blue focus:ring-1 focus:ring-blue-500/20 shadow-xs"
+                  />
+                </div>
+                <button
+                  onClick={handleApplyPromo}
+                  className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-bold transition flex-shrink-0 active:scale-95 shadow-xs"
+                >
+                  Apply
+                </button>
+              </div>
+
+              {promoMessage && (
+                <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 px-1">
+                  {promoMessage}
                 </div>
               )}
 
+              {/* Payment Method Selector (Always Visible & Accessible) */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200 text-xs shadow-xs">
+                <span className="font-semibold text-slate-500 text-[11px]">Payment:</span>
+                <div className="flex gap-1.5">
+                  {(['WALLET', 'UPI', 'CASH'] as const).map(pm => (
+                    <button
+                      key={pm}
+                      onClick={() => setPaymentMethod(pm)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] bg-white transition flex items-center gap-1 ${
+                        paymentMethod === pm
+                          ? 'border-2 border-brand-blue text-brand-blue font-black shadow-xs ring-1 ring-blue-500/20'
+                          : 'border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-800 font-semibold'
+                      }`}
+                    >
+                      {pm === 'WALLET' ? `Wallet (₹${walletBalance})` : pm}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Confirm Delivery / Ride / Enter Pickup & Drop Button */}
               <button 
                 onClick={() => {
                   if (!pickup || !drop) {

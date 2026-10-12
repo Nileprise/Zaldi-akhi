@@ -350,3 +350,396 @@ export function canBookSeatsForSubTrip(
     bottleneckSegment: bottleneck
   };
 }
+
+/**
+ * 5. SMART ROUTE MATCHING & FLEXIBLE PICKUP / DROP ENGINE
+ * 
+ * Compares passenger pickup & destination against driver's corridor stops and polyline:
+ * - Direct route match: Driver's route reaches your destination.
+ * - Connected route match: Driver passes through a suitable point near your destination.
+ * - Partial journey: Travel part of the way and select an intermediate drop-off.
+ */
+export type RouteMatchType = 'DIRECT' | 'CONNECTED' | 'PARTIAL' | 'NO_MATCH';
+
+export interface VerifiedTransferConnection {
+  transferHubId: string;
+  transferHubName: string;
+  destinationMatch: string;
+  transitMode: 'METRO' | 'AIRPORT_EXPRESS' | 'ORR_SHUTTLE' | 'INTERCITY_BUS';
+  connectionName: string;
+  transferDurationMin: number;
+  totalTripEstimatedMin: number;
+  instructions: string;
+}
+
+export interface CarpoolRouteStop {
+  id: string;
+  name: string;
+  order: number;
+  location: { x: number; y: number };
+  eta: string;
+  isLegallyApprovedStop?: boolean;
+  legalStopType?: string; // 'Designated Bus Bay' | 'Metro Kiss-and-Ride' | 'Highway Toll Transit Stop' | 'Airport Commercial Drop'
+  legalStopNotes?: string;
+}
+
+// Master registry of verified transfer points and their transit connections
+export const VERIFIED_TRANSFER_HUBS: Record<string, VerifiedTransferConnection[]> = {
+  'Uppal Metro Hub': [
+    {
+      transferHubId: 'hub-uppal-mindspace',
+      transferHubName: 'Uppal Metro Hub',
+      destinationMatch: 'mindspace',
+      transitMode: 'METRO',
+      connectionName: 'Hyderabad Metro (Blue Line)',
+      transferDurationMin: 24,
+      totalTripEstimatedMin: 90,
+      instructions: 'Step off at Uppal Metro dedicated Kiss-and-Ride bay. Board Hyderabad Metro Blue Line directly to Mindspace / Raidurg (trains every 4 mins).'
+    },
+    {
+      transferHubId: 'hub-uppal-hitec',
+      transferHubName: 'Uppal Metro Hub',
+      destinationMatch: 'hitec',
+      transitMode: 'METRO',
+      connectionName: 'Hyderabad Metro (Blue Line)',
+      transferDurationMin: 22,
+      totalTripEstimatedMin: 88,
+      instructions: 'Transfer to Blue Line Metro towards Hitec City. Fast direct elevated rail avoiding city traffic.'
+    },
+    {
+      transferHubId: 'hub-uppal-airport',
+      transferHubName: 'Uppal Metro Hub',
+      destinationMatch: 'airport',
+      transitMode: 'AIRPORT_EXPRESS',
+      connectionName: 'Pushpak Airport Liner (AC-12)',
+      transferDurationMin: 45,
+      totalTripEstimatedMin: 110,
+      instructions: 'Transfer at Uppal Ring Road Pushpak AC Express Coach directly to RGIA Airport Terminal via Outer Ring Road.'
+    },
+    {
+      transferHubId: 'hub-uppal-secunderabad',
+      transferHubName: 'Uppal Metro Hub',
+      destinationMatch: 'secunderabad',
+      transitMode: 'METRO',
+      connectionName: 'Hyderabad Metro Line 3 / City Bus 18',
+      transferDurationMin: 15,
+      totalTripEstimatedMin: 80,
+      instructions: 'Transfer at Uppal Metro cross-terminal to Secunderabad Rail Terminal.'
+    }
+  ],
+  'Secunderabad Stn': [
+    {
+      transferHubId: 'hub-secunderabad-airport',
+      transferHubName: 'Secunderabad Stn',
+      destinationMatch: 'airport',
+      transitMode: 'AIRPORT_EXPRESS',
+      connectionName: 'Pushpak AC Airport Express (Direct)',
+      transferDurationMin: 38,
+      totalTripEstimatedMin: 78,
+      instructions: 'Alight at Secunderabad Railway West Gate. Board direct Pushpak AC Express every 15 mins to RGIA Airport Departures.'
+    },
+    {
+      transferHubId: 'hub-secunderabad-mindspace',
+      transferHubName: 'Secunderabad Stn',
+      destinationMatch: 'mindspace',
+      transitMode: 'METRO',
+      connectionName: 'Parade Grounds Interchange to Blue Line',
+      transferDurationMin: 20,
+      totalTripEstimatedMin: 65,
+      instructions: 'Step into Parade Grounds Metro interchange, board Blue Line direct to Mindspace IT Park.'
+    }
+  ],
+  'Ghatkesar ORR Junction': [
+    {
+      transferHubId: 'hub-ghatkesar-airport',
+      transferHubName: 'Ghatkesar ORR Junction',
+      destinationMatch: 'airport',
+      transitMode: 'ORR_SHUTTLE',
+      connectionName: 'Nehru ORR Expressway Feeder',
+      transferDurationMin: 32,
+      totalTripEstimatedMin: 85,
+      instructions: 'Alight at Ghatkesar Toll Plaza designated carpool bay. Take ORR Express Shuttle directly down expressway south to RGIA.'
+    },
+    {
+      transferHubId: 'hub-ghatkesar-hyderabad',
+      transferHubName: 'Ghatkesar ORR Junction',
+      destinationMatch: 'hyderabad',
+      transitMode: 'METRO',
+      connectionName: 'Uppal Expressway Link & Metro',
+      transferDurationMin: 22,
+      totalTripEstimatedMin: 75,
+      instructions: 'Take 12-min connecting electric shuttle to Uppal Metro Station into Hyderabad Core.'
+    }
+  ]
+};
+
+export interface RouteMatchAnalysis {
+  matchType: RouteMatchType;
+  matchTitle: string;
+  matchDescription: string;
+  matchBadgeColor: {
+    bg: string;
+    text: string;
+    border: string;
+  };
+  compatibilityScore: number; // 0 to 100%
+  pickupStop: CarpoolRouteStop;
+  pickupDistanceKm: number;
+  dropoffStop: CarpoolRouteStop;
+  dropoffDistanceKm: number;
+  isPartialRoute: boolean;
+  recommendedIntermediateDropoff?: CarpoolRouteStop;
+  availableIntermediateDropoffs: CarpoolRouteStop[];
+  estimatedArrivalMin: number;
+  calculatedFare: number;
+  remainingSeats: number;
+  routeHighlights: string;
+  verifiedTransfer?: VerifiedTransferConnection;
+  isLegallyVerifiedStop: boolean;
+  legalStopBadgeText: string;
+  unmatchedReason?: string;
+}
+
+/**
+ * Evaluates whether a destination address or junction connects via a verified transfer hub
+ */
+export function findTransferConnection(
+  driverStops: CarpoolRouteStop[],
+  destinationAddress: string
+): { transferStop: CarpoolRouteStop; connection: VerifiedTransferConnection } | null {
+  const destLower = destinationAddress.toLowerCase();
+  
+  for (const stop of driverStops) {
+    const stopLower = stop.name.toLowerCase();
+    let hubConnections: VerifiedTransferConnection[] | undefined = VERIFIED_TRANSFER_HUBS[stop.name];
+
+    if (!hubConnections) {
+      for (const [hubKey, conns] of Object.entries(VERIFIED_TRANSFER_HUBS)) {
+        const hubKeyLower = hubKey.toLowerCase();
+        if (
+          stopLower.includes(hubKeyLower) || 
+          hubKeyLower.includes(stopLower) ||
+          (stopLower.includes('uppal') && hubKeyLower.includes('uppal')) ||
+          (stopLower.includes('ghatkesar') && hubKeyLower.includes('ghatkesar')) ||
+          (stopLower.includes('secunderabad') && hubKeyLower.includes('secunderabad'))
+        ) {
+          hubConnections = conns;
+          break;
+        }
+      }
+    }
+
+    if (hubConnections) {
+      for (const conn of hubConnections) {
+        if (destLower.includes(conn.destinationMatch)) {
+          return { transferStop: stop, connection: conn };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+export function matchDriverRouteToPassenger(
+  driver: {
+    id: string;
+    driverName: string;
+    from: string;
+    to: string;
+    basePricePerSeat: number;
+    totalSeats: number;
+    corridorStops: CarpoolRouteStop[];
+    routePolyline: RoutePoint[];
+  },
+  passengerPickupPos: { x: number; y: number },
+  passengerDestPos?: { x: number; y: number } | null,
+  passengerDestAddress?: string,
+  bookings: CarpoolSegmentBooking[] = []
+): RouteMatchAnalysis {
+  const sortedStops = [...driver.corridorStops].sort((a, b) => a.order - b.order);
+
+  // 1. Calculate road geometry distance from passenger pickup to driver route
+  let bestPickupStop = sortedStops[0];
+  let minPickupDistCanvas = Infinity;
+
+  sortedStops.forEach(stop => {
+    const d = Math.hypot(stop.location.x - passengerPickupPos.x, stop.location.y - passengerPickupPos.y);
+    if (d < minPickupDistCanvas) {
+      minPickupDistCanvas = d;
+      bestPickupStop = stop;
+    }
+  });
+
+  const pickupDistanceKm = +(minPickupDistCanvas * 0.22).toFixed(1);
+
+  // Candidate drop-off stops strictly after pickup stop
+  const candidateDropStops = sortedStops.filter(s => s.order > bestPickupStop.order);
+  const validStops = candidateDropStops.length > 0 ? candidateDropStops : [sortedStops[sortedStops.length - 1]];
+
+  let bestDropoffStop = validStops[validStops.length - 1];
+  let minDropDistCanvas = Infinity;
+
+  if (passengerDestPos) {
+    validStops.forEach(stop => {
+      const d = Math.hypot(stop.location.x - passengerDestPos.x, stop.location.y - passengerDestPos.y);
+      if (d < minDropDistCanvas) {
+        minDropDistCanvas = d;
+        bestDropoffStop = stop;
+      }
+    });
+  } else {
+    minDropDistCanvas = 0;
+  }
+
+  const dropoffDistanceKm = +(minDropDistCanvas * 0.22).toFixed(1);
+
+  // Check road-route geometry distance from destination to driver's route polyline
+  let destDistanceToPolylineMeters = 99999;
+  if (passengerDestPos && driver.routePolyline.length > 1) {
+    const polylineCheck = calculatePassengerOnRoute(passengerDestPos, driver.routePolyline, 3000);
+    destDistanceToPolylineMeters = polylineCheck.distanceFromHighwayMeters;
+  }
+
+  // 2. Verified Transfer Point Lookup
+  const destAddressClean = passengerDestAddress || '';
+  const transferInfo = findTransferConnection(validStops, destAddressClean);
+
+  // 3. Precise destination name match
+  const destText = destAddressClean.toLowerCase().trim();
+  const driverToText = driver.to.toLowerCase();
+  const dropStopText = bestDropoffStop.name.toLowerCase();
+
+  // Strict Direct Match Rules:
+  // Must be an actual route point or approved stop within <= 1.5 km (or 1500m to road polyline).
+  // "Do not mark a destination as direct merely because it is in the same city."
+  const isDirectStopNameMatch = Boolean(
+    destText &&
+    (dropStopText.includes(destText) ||
+     (driverToText.includes(destText) && dropoffDistanceKm <= 2.2))
+  );
+
+  const isGeometricallyAtDestination = dropoffDistanceKm <= 1.5 || destDistanceToPolylineMeters <= 1500;
+  const isDirectMatch = Boolean(passengerDestPos && (isDirectStopNameMatch || isGeometricallyAtDestination));
+
+  // Determine Directional / Coverage Validity
+  // If pickup is too far away (> 7.5 km) with no corridor overlap, or driver has passed, mark as NO_MATCH
+  const isPickupTooFar = pickupDistanceKm > 7.5;
+
+  let matchType: RouteMatchType = 'DIRECT';
+  let matchTitle = "Direct route match";
+  let matchDescription = "Driver's route reaches your destination.";
+  let isPartialRoute = false;
+  let unmatchedReason: string | undefined;
+
+  if (!passengerDestPos) {
+    matchType = 'DIRECT';
+    matchTitle = 'Direct corridor ride';
+    matchDescription = "Departs near your pickup with stops along the highway.";
+  } else if (isPickupTooFar) {
+    matchType = 'NO_MATCH';
+    matchTitle = 'No match';
+    matchDescription = `Driver departs outside your pickup corridor (${pickupDistanceKm} km away).`;
+    unmatchedReason = `Pickup distance (${pickupDistanceKm} km) exceeds local corridor threshold.`;
+  } else if (isDirectMatch) {
+    matchType = 'DIRECT';
+    matchTitle = 'Direct route match';
+    matchDescription = "Driver's route reaches your destination or designated drop-off point.";
+  } else if (transferInfo) {
+    matchType = 'CONNECTED';
+    matchTitle = 'Connected route match';
+    matchDescription = `Driver reaches ${transferInfo.transferStop.name} verified transfer point for ${transferInfo.connection.connectionName}.`;
+    bestDropoffStop = transferInfo.transferStop;
+  } else {
+    // Check if the driver covers part of the passenger's journey towards destination
+    // Vector check: Is dropoff stop closer to passenger destination than pickup stop?
+    const pickupToDestDist = passengerDestPos 
+      ? Math.hypot(passengerDestPos.x - passengerPickupPos.x, passengerDestPos.y - passengerPickupPos.y)
+      : 0;
+    const dropToDestDist = passengerDestPos
+      ? Math.hypot(passengerDestPos.x - bestDropoffStop.location.x, passengerDestPos.y - bestDropoffStop.location.y)
+      : 0;
+    
+    const isProgressingTowardsDestination = dropToDestDist < pickupToDestDist * 0.92;
+
+    if (isProgressingTowardsDestination && validStops.length > 0) {
+      matchType = 'PARTIAL';
+      matchTitle = 'Partial journey';
+      matchDescription = `Driver covers journey to ${bestDropoffStop.name}. Select an intermediate drop-off.`;
+      isPartialRoute = true;
+    } else {
+      matchType = 'NO_MATCH';
+      matchTitle = 'No route match';
+      matchDescription = 'Driver route does not connect or progress towards requested destination.';
+      unmatchedReason = 'Vehicle corridor does not intersect passenger destination or verified transfer hubs.';
+    }
+  }
+
+  // 4. Calculate dynamic fare for selected segments
+  const totalCorridorSegments = Math.max(1, sortedStops.length - 1);
+  const journeySegments = Math.max(1, bestDropoffStop.order - bestPickupStop.order);
+  const segmentRatio = journeySegments / totalCorridorSegments;
+  const calculatedFare = matchType === 'NO_MATCH' 
+    ? driver.basePricePerSeat 
+    : Math.round(Math.max(50, driver.basePricePerSeat * Math.min(1, 0.45 + segmentRatio * 0.55)));
+
+  // 5. Seat capacities along selected sub-trip
+  const segOccupancy = calculateSegmentSeatCapacities(sortedStops, driver.totalSeats, bookings);
+  const eligibility = canBookSeatsForSubTrip(bestPickupStop.id, bestDropoffStop.id, 1, sortedStops, segOccupancy);
+  const remainingSeats = eligibility.minAvailableSeatsAcrossTrip;
+
+  // 6. Compatibility Score computation
+  let baseScore = 0;
+  if (matchType === 'DIRECT') baseScore = 96;
+  else if (matchType === 'CONNECTED') baseScore = 86;
+  else if (matchType === 'PARTIAL') baseScore = 72;
+  else baseScore = 20;
+
+  const pickupPenalty = Math.min(25, pickupDistanceKm * 3.2);
+  const dropPenalty = matchType === 'DIRECT' ? 0 : Math.min(22, dropoffDistanceKm * 1.5);
+  const seatBonus = remainingSeats > 0 ? 5 : -30;
+
+  const compatibilityScore = matchType === 'NO_MATCH' 
+    ? Math.max(5, Math.min(30, Math.round(baseScore - pickupPenalty)))
+    : Math.max(45, Math.min(99, Math.round(baseScore - pickupPenalty - dropPenalty + seatBonus)));
+
+  // ETA in minutes
+  const estimatedArrivalMin = Math.round(10 + journeySegments * 18);
+
+  const matchBadgeColor = matchType === 'DIRECT' 
+    ? { bg: 'bg-emerald-50 text-emerald-800 border-emerald-300', text: 'text-emerald-700', border: 'border-emerald-400' }
+    : matchType === 'CONNECTED'
+    ? { bg: 'bg-blue-50 text-blue-800 border-blue-300', text: 'text-blue-700', border: 'border-blue-400' }
+    : matchType === 'PARTIAL'
+    ? { bg: 'bg-amber-50 text-amber-800 border-amber-300', text: 'text-amber-700', border: 'border-amber-400' }
+    : { bg: 'bg-rose-50 text-rose-800 border-rose-300', text: 'text-rose-700', border: 'border-rose-400' };
+
+  // Legal verification details
+  const isLegallyVerifiedStop = bestDropoffStop.isLegallyApprovedStop !== false;
+  const legalStopBadgeText = bestDropoffStop.legalStopType 
+    ? `Authorized Stop: ${bestDropoffStop.legalStopType}`
+    : 'Authorized Passenger Pickup/Drop Bay';
+
+  return {
+    matchType,
+    matchTitle,
+    matchDescription,
+    matchBadgeColor,
+    compatibilityScore,
+    pickupStop: bestPickupStop,
+    pickupDistanceKm,
+    dropoffStop: bestDropoffStop,
+    dropoffDistanceKm,
+    isPartialRoute,
+    recommendedIntermediateDropoff: isPartialRoute ? bestDropoffStop : undefined,
+    availableIntermediateDropoffs: validStops,
+    estimatedArrivalMin,
+    calculatedFare,
+    remainingSeats,
+    routeHighlights: `${bestPickupStop.name.split(' ')[0]} → ${bestDropoffStop.name.split(' ')[0]}`,
+    verifiedTransfer: transferInfo?.connection,
+    isLegallyVerifiedStop,
+    legalStopBadgeText,
+    unmatchedReason
+  };
+}

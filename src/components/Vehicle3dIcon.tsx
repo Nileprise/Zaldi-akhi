@@ -6,7 +6,14 @@ import {
   getVehicleImageSrc,
   getVehicleTheme,
   VehicleTierType,
-  VEHICLE_5D_THEMES
+  VEHICLE_5D_THEMES,
+  VectorCabPrime,
+  VectorZaldiXl,
+  VectorBikeMoto,
+  VectorAutoTukTuk,
+  VectorMiniTruck,
+  VectorParcelExpress,
+  renderVectorVehicleSvg
 } from './Vehicle5dIcon';
 
 export { 
@@ -15,7 +22,14 @@ export {
   Destination5dPin, 
   getVehicleImageSrc, 
   getVehicleTheme, 
-  VEHICLE_5D_THEMES 
+  VEHICLE_5D_THEMES,
+  VectorCabPrime,
+  VectorZaldiXl,
+  VectorBikeMoto,
+  VectorAutoTukTuk,
+  VectorMiniTruck,
+  VectorParcelExpress,
+  renderVectorVehicleSvg
 };
 export type { VehicleTierType };
 

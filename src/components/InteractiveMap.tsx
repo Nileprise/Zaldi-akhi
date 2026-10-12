@@ -152,9 +152,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   };
 
-  // Pin style selector
+  // Pin style selector (Defaults to character 3D Boy Pin)
   const [activePinStyle, setActivePinStyle] = useState<PinStyleType>(
-    (locationPinType as PinStyleType) || 'animated_radar'
+    (locationPinType as PinStyleType) || 'character_pin'
   );
 
   // Map Layers state
@@ -217,6 +217,140 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     if (raw.includes('PARCEL')) return 'PARCEL';
     return 'CAB';
   }, [selectedVehicleId, vehicleTierName]);
+
+  // Vehicle-specific road route path styling & corridor paths
+  const selectedTierPathStyle = useMemo(() => {
+    switch (normalizedVehicleType) {
+      case 'BIKE':
+        return {
+          gradUrl: 'url(#bikeRouteGrad)',
+          glowColor: '#06b6d4',
+          casingWidth: 8,
+          strokeWidth: 3.6,
+          glowWidth: 5.5,
+          dashWidth: 1.2,
+          dashArray: '3 3',
+          filterUrl: 'url(#bikeRouteGlow)',
+          previewPath: 'M 15 78 Q 32 58 48 46 T 76 28 T 92 18',
+          badgeText: '⚡ Bike Moto Lane · Rapid City Filter',
+          badgeBg: 'bg-emerald-600 text-white',
+          themeColor: '#06b6d4',
+          vehicleIcon: '🏍️'
+        };
+      case 'AUTO':
+        return {
+          gradUrl: 'url(#autoRouteGrad)',
+          glowColor: '#f59e0b',
+          casingWidth: 8.5,
+          strokeWidth: 4.0,
+          glowWidth: 6.0,
+          dashWidth: 1.3,
+          dashArray: '5 3',
+          filterUrl: 'url(#autoRouteGlow)',
+          previewPath: 'M 10 46 Q 32 54 52 46 T 88 46',
+          badgeText: '🛺 Auto 3W Arterial · City Connect',
+          badgeBg: 'bg-amber-600 text-white',
+          themeColor: '#f59e0b',
+          vehicleIcon: '🛺'
+        };
+      case 'PREMIUM':
+        return {
+          gradUrl: 'url(#zaldiXlRouteGrad)',
+          glowColor: '#8b5cf6',
+          casingWidth: 9.5,
+          strokeWidth: 4.6,
+          glowWidth: 7.0,
+          dashWidth: 1.5,
+          dashArray: '7 4',
+          filterUrl: 'url(#zaldiXlRouteGlow)',
+          previewPath: 'M 6 86 Q 22 40 50 16 T 95 12',
+          badgeText: '👑 Zaldi XL · VIP Elevated Expressway',
+          badgeBg: 'bg-purple-700 text-white',
+          themeColor: '#8b5cf6',
+          vehicleIcon: '✨'
+        };
+      case 'TRUCK':
+        return {
+          gradUrl: 'url(#truckRouteGrad)',
+          glowColor: '#ea580c',
+          casingWidth: 9.5,
+          strokeWidth: 4.8,
+          glowWidth: 6.8,
+          dashWidth: 1.5,
+          dashArray: '8 5',
+          filterUrl: 'url(#truckRouteGlow)',
+          previewPath: 'M 10 68 Q 36 65 52 74 T 88 70',
+          badgeText: '🚚 Commercial Freight · Max 750kg Logistics',
+          badgeBg: 'bg-orange-600 text-white',
+          themeColor: '#ea580c',
+          vehicleIcon: '🚚'
+        };
+      case 'CAB':
+      default:
+        return {
+          gradUrl: 'url(#cabRouteGrad)',
+          glowColor: '#2563eb',
+          casingWidth: 9,
+          strokeWidth: 4.2,
+          glowWidth: 6.4,
+          dashWidth: 1.4,
+          dashArray: '6 4',
+          filterUrl: 'url(#cabRouteGlow)',
+          previewPath: 'M 24 10 Q 36 46 54 52 T 86 84',
+          badgeText: '🚗 Cab Prime · Central Highway Avenue',
+          badgeBg: 'bg-blue-600 text-white',
+          themeColor: '#2563eb',
+          vehicleIcon: '🚗'
+        };
+    }
+  }, [normalizedVehicleType]);
+
+  // Live vehicle position progression along preview path
+  const [vehiclePathProgress, setVehiclePathProgress] = useState(0.25);
+  useEffect(() => {
+    if (pickup && drop) return;
+    const interval = setInterval(() => {
+      setVehiclePathProgress(prev => {
+        const next = prev + 0.012;
+        return next > 0.95 ? 0.05 : +next.toFixed(3);
+      });
+    }, 1200);
+    return () => clearInterval(interval);
+  }, [pickup, drop]);
+
+  // Interpolated (x, y) along preview path
+  const previewVehicleCoords = useMemo(() => {
+    const t = vehiclePathProgress;
+    const tInv = 1 - t;
+    switch (normalizedVehicleType) {
+      case 'BIKE': {
+        const x = tInv * tInv * 15 + 2 * tInv * t * 45 + t * t * 92;
+        const y = tInv * tInv * 78 + 2 * tInv * t * 46 + t * t * 18;
+        return { x: +x.toFixed(1), y: +y.toFixed(1) };
+      }
+      case 'AUTO': {
+        const x = tInv * tInv * 10 + 2 * tInv * t * 48 + t * t * 88;
+        const y = tInv * tInv * 46 + 2 * tInv * t * 54 + t * t * 46;
+        return { x: +x.toFixed(1), y: +y.toFixed(1) };
+      }
+      case 'PREMIUM': {
+        const x = tInv * tInv * 6 + 2 * tInv * t * 45 + t * t * 95;
+        const y = tInv * tInv * 86 + 2 * tInv * t * 20 + t * t * 12;
+        return { x: +x.toFixed(1), y: +y.toFixed(1) };
+      }
+      case 'TRUCK': {
+        const x = tInv * tInv * 10 + 2 * tInv * t * 45 + t * t * 88;
+        const y = tInv * tInv * 68 + 2 * tInv * t * 74 + t * t * 70;
+        return { x: +x.toFixed(1), y: +y.toFixed(1) };
+      }
+      case 'CAB':
+      default: {
+        const x = tInv * tInv * 24 + 2 * tInv * t * 50 + t * t * 86;
+        const y = tInv * tInv * 10 + 2 * tInv * t * 50 + t * t * 84;
+        return { x: +x.toFixed(1), y: +y.toFixed(1) };
+      }
+    }
+  }, [vehiclePathProgress, normalizedVehicleType]);
 
   // 1. Resolve Pickup and Destination road junctions (anchors to pickup address if set, else current location / fixed pin)
   const pickupJunction = useMemo(() => {
@@ -593,6 +727,41 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               <stop offset="100%" stopColor="#10b981" />
             </linearGradient>
 
+            {/* 1. BIKE MOTO ROUTE GRADIENT */}
+            <linearGradient id="bikeRouteGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#10b981" />
+              <stop offset="50%" stopColor="#06b6d4" />
+              <stop offset="100%" stopColor="#3b82f6" />
+            </linearGradient>
+
+            {/* 2. AUTO 3W ROUTE GRADIENT */}
+            <linearGradient id="autoRouteGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#facc15" />
+              <stop offset="50%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#d97706" />
+            </linearGradient>
+
+            {/* 3. CAB / CAR ROUTE GRADIENT */}
+            <linearGradient id="cabRouteGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#38bdf8" />
+              <stop offset="50%" stopColor="#2563eb" />
+              <stop offset="100%" stopColor="#1d4ed8" />
+            </linearGradient>
+
+            {/* 4. ZALDI XL / PREMIUM ROUTE GRADIENT */}
+            <linearGradient id="zaldiXlRouteGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#c084fc" />
+              <stop offset="50%" stopColor="#8b5cf6" />
+              <stop offset="100%" stopColor="#6366f1" />
+            </linearGradient>
+
+            {/* 5. MINI TRUCK / CARGO FREIGHT ROUTE GRADIENT */}
+            <linearGradient id="truckRouteGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#fb923c" />
+              <stop offset="50%" stopColor="#ea580c" />
+              <stop offset="100%" stopColor="#b45309" />
+            </linearGradient>
+
             {/* Satellite Terrain Grid Pattern */}
             <pattern id="satGrid" width="6" height="6" patternUnits="userSpaceOnUse">
               <path d="M 6 0 L 0 0 0 6" fill="none" stroke="#162e24" strokeWidth="0.25" opacity="0.6" />
@@ -610,6 +779,27 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
             <filter id="layerAura" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="0.5" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+
+            <filter id="bikeRouteGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="0.9" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="autoRouteGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="0.9" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="cabRouteGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.0" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="zaldiXlRouteGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.1" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="truckRouteGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.0" result="blur" />
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
           </defs>
@@ -780,26 +970,36 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </g>
           )}
 
-          {/* 1. ACTUAL ROAD ROUTE: PICKUP -> DESTINATION */}
+          {/* 1. ACTUAL ROAD ROUTE: PICKUP -> DESTINATION (With Vehicle Tier Specific Styling & Thick White Casing) */}
           {roadRoute && (
             <>
-              {/* Outer Glow Outline */}
+              {/* Thick White Casing (Dual-stroke aesthetic like carpool highway) */}
               <path
                 d={roadRoute.pathD}
                 fill="none"
-                stroke="#0066FF"
-                strokeWidth="4.5"
+                stroke={baseLayerStyle === 'night' ? '#1e293b' : '#FFFFFF'}
+                strokeWidth={selectedTierPathStyle.casingWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.95"
+              />
+              {/* Outer Glow Halo Outline */}
+              <path
+                d={roadRoute.pathD}
+                fill="none"
+                stroke={selectedTierPathStyle.glowColor}
+                strokeWidth={selectedTierPathStyle.glowWidth}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 opacity="0.45"
-                filter="url(#routeGlow)"
+                filter={selectedTierPathStyle.filterUrl}
               />
               {/* Main Vivid Colored Road Route */}
               <path
                 d={roadRoute.pathD}
                 fill="none"
-                stroke="url(#roadRouteGrad)"
-                strokeWidth="2.6"
+                stroke={selectedTierPathStyle.gradUrl}
+                strokeWidth={selectedTierPathStyle.strokeWidth}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -808,13 +1008,67 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 d={roadRoute.pathD}
                 fill="none"
                 stroke="#ffffff"
-                strokeWidth="1.2"
+                strokeWidth={selectedTierPathStyle.dashWidth}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeDasharray="4 4"
+                strokeDasharray={selectedTierPathStyle.dashArray}
                 className="animate-dash"
-                opacity="0.9"
+                opacity="0.95"
               />
+            </>
+          )}
+
+          {/* 1B. PREVIEW CORRIDOR PATH FOR SELECTED VEHICLE TIER (BIKE, AUTO, CAB, ZALDI XL, MINI TRUCK) */}
+          {!roadRoute && !isCarpoolActive && (
+            <>
+              {/* Thick White Casing */}
+              <path
+                d={selectedTierPathStyle.previewPath}
+                fill="none"
+                stroke={baseLayerStyle === 'night' ? '#1e293b' : '#FFFFFF'}
+                strokeWidth={selectedTierPathStyle.casingWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.95"
+              />
+              {/* Outer Glow Halo */}
+              <path
+                d={selectedTierPathStyle.previewPath}
+                fill="none"
+                stroke={selectedTierPathStyle.glowColor}
+                strokeWidth={selectedTierPathStyle.glowWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.4"
+                filter={selectedTierPathStyle.filterUrl}
+              />
+              {/* Main Vivid Vehicle Tier Line */}
+              <path
+                d={selectedTierPathStyle.previewPath}
+                fill="none"
+                stroke={selectedTierPathStyle.gradUrl}
+                strokeWidth={selectedTierPathStyle.strokeWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Animated Dashed Shimmer Line */}
+              <path
+                d={selectedTierPathStyle.previewPath}
+                fill="none"
+                stroke="#ffffff"
+                strokeWidth={selectedTierPathStyle.dashWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray={selectedTierPathStyle.dashArray}
+                className="animate-dash"
+                opacity="0.95"
+              />
+
+              {/* Moving Vehicle Beacon along the active tier path */}
+              <g transform={`translate(${previewVehicleCoords.x}, ${previewVehicleCoords.y})`}>
+                <circle cx="0" cy="0" r="5" fill={selectedTierPathStyle.themeColor} stroke="#FFFFFF" strokeWidth="1.8" />
+                <circle cx="0" cy="0" r="10" fill={selectedTierPathStyle.themeColor} opacity="0.25" className="animate-ping" />
+              </g>
             </>
           )}
 
@@ -909,15 +1163,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </>
         )}
 
-        {/* Authentic POI Landmark Marker */}
-        <div 
-          className="absolute top-[62%] left-[34%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-        >
-          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-900/80 border border-slate-700/80 backdrop-blur-md text-[9px] font-bold text-slate-300 shadow">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            <span>Warangal Stn</span>
+        {/* Floating Vehicle Tier Corridor Active Badge on Map Canvas */}
+        {!roadRoute && !isCarpoolActive && (
+          <div className="absolute top-[18%] left-[12%] z-20 pointer-events-none animate-in fade-in">
+            <div className={`px-2.5 py-1 rounded-xl text-[10px] font-black shadow-md border border-white/50 flex items-center gap-1.5 ${selectedTierPathStyle.badgeBg}`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              <span>{selectedTierPathStyle.badgeText}</span>
+            </div>
           </div>
-        </div>
+        )}
+
 
         {/* BEFORE BOOKING: SHOW NEARBY RIDES NEAR CURRENT OR PICKUP LOCATION BY SELECTED VEHICLE */}
         {showNearbyDrivers && (status === 'IDLE' || status === 'FINDING_DRIVER') && liveNearbyDrivers.map((d) => {
@@ -936,8 +1191,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           );
         })}
 
-        {/* 🏁 DESTINATION PIN (When route is active) */}
-        {drop && roadRoute && (
+        {/* 🏁 DESTINATION PIN (When route is active or carpool destination is set) */}
+        {drop && (roadRoute || isCarpoolActive) && (
           <div
             style={{ top: `${dropJunction.y}%`, left: `${dropJunction.x}%` }}
             className="absolute -translate-x-1/2 -translate-y-full z-20 pointer-events-none"
@@ -946,8 +1201,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </div>
         )}
 
-        {/* 📍 BOY PICKUP PIN (When route is active or ride is in progress) */}
-        {pickup && (status !== 'IDLE' || Boolean(drop && roadRoute)) && (
+        {/* 📍 BOY PICKUP PIN (Always visible in Carpool mode, or when route is active / ride in progress / fixed center pin disabled) */}
+        {(isCarpoolActive || pickup || liveAddress || fixedPinAddress) && (
+          isCarpoolActive || status !== 'IDLE' || Boolean(drop && roadRoute) || !showFixedPin
+        ) && (
           <div
             style={{ top: `${pickupJunction.y}%`, left: `${pickupJunction.x}%` }}
             className="absolute -translate-x-1/2 -translate-y-[88%] z-25 pointer-events-auto select-none"
@@ -970,7 +1227,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                         handleCommitRoutePill();
                       } else if (e.key === 'Escape') {
                         setIsRoutePillEditing(false);
-                        setRoutePillInput(pickup);
+                        setRoutePillInput(pickup || liveAddress || fixedPinAddress || DEFAULT_GPS_ADDRESS);
                       }
                     }}
                     onBlur={handleCommitRoutePill}
@@ -984,14 +1241,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsRoutePillEditing(true);
-                    setRoutePillInput(pickup);
+                    setRoutePillInput(pickup || liveAddress || fixedPinAddress || DEFAULT_GPS_ADDRESS);
                   }}
                   className="mb-1 px-3 py-1.5 bg-slate-900/95 backdrop-blur-md border border-emerald-500/60 hover:border-emerald-400 rounded-full shadow-2xl flex items-center gap-1.5 max-w-[280px] cursor-pointer hover:scale-105 active:scale-95 transition pointer-events-auto"
                   title="Tap address to edit"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
                   <span className="text-[10px] font-black text-white truncate max-w-[200px]">
-                    {pickup}
+                    {pickup || liveAddress || fixedPinAddress || DEFAULT_GPS_ADDRESS}
                   </span>
                 </div>
               )}
@@ -1062,21 +1319,25 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {isCarpoolActive && (
           <>
             {/* Waypoint Stop Badges on Road Network */}
-            {carpoolStops && carpoolStops.map((stop, sIdx) => (
-              <div
-                key={stop.id}
-                style={{ top: `${stop.location.y}%`, left: `${stop.location.x}%` }}
-                className="absolute -translate-x-1/2 -translate-y-1/2 z-22 pointer-events-none"
-              >
-                <div className="flex flex-col items-center">
-                  <div className="px-2 py-0.5 rounded-full bg-slate-950/90 text-white border border-cyan-400/80 text-[8px] font-black shadow-lg flex items-center gap-1 whitespace-nowrap mb-0.5 backdrop-blur-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                    <span>{stop.name}</span>
+            {carpoolStops && carpoolStops.map((stop) => {
+              const isPickupStop = Math.hypot(stop.location.x - pickupJunction.x, stop.location.y - pickupJunction.y) < 3.5;
+              if (isPickupStop) return null; // Avoid duplicate badge right on top of the pickup boy pin!
+              return (
+                <div
+                  key={stop.id}
+                  style={{ top: `${stop.location.y}%`, left: `${stop.location.x}%` }}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 z-22 pointer-events-none"
+                >
+                  <div className="flex flex-col items-center">
+                    <div className="px-2 py-0.5 rounded-full bg-slate-950/90 text-white border border-cyan-400/80 text-[8px] font-black shadow-lg flex items-center gap-1 whitespace-nowrap mb-0.5 backdrop-blur-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                      <span>{stop.name}</span>
+                    </div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 border-2 border-white shadow-md ring-2 ring-cyan-500/40" />
                   </div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 border-2 border-white shadow-md ring-2 ring-cyan-500/40" />
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Live Moving Carpool Driver on the Corridor */}
             {carpoolDriverPos && (
@@ -1104,7 +1365,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       </div>
 
       {/* 📍 ANIMATED LOCATION PIN (STAYS FIXED ON SCREEN WHILE MAP MOVES UNDERNEATH) */}
-      {showFixedPin && status === 'IDLE' && (
+      {showFixedPin && !isCarpoolActive && status === 'IDLE' && !drop && !roadRoute && (
         <div 
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[88%] z-40 pointer-events-none select-none flex flex-col items-center"
         >
@@ -1141,7 +1402,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </button>
 
         {/* 2. PIN STYLE CYCLE BUTTON */}
-        {status === 'IDLE' && (
+        {status === 'IDLE' && !drop && !roadRoute && (
           <button 
             onClick={handleCyclePinStyle}
             title={`Pin Style: ${activePinStyle}`}
@@ -1322,7 +1583,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       )}
 
       {/* “CONFIRM LOCATION” FLOATING ACTION BUTTON ON MAP (WHEN PICKING PICKUP) */}
-      {status === 'IDLE' && (
+      {status === 'IDLE' && !drop && !roadRoute && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 w-[90%] max-w-xs pointer-events-auto">
           <button
             onClick={(e) => {
