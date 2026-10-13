@@ -59,8 +59,67 @@ export function resolveAddressToRoadJunction(address: string): RoutePoint {
   return { x, y, streetName: 'Main Arterial Street' };
 }
 
+import { 
+  getRealRoadRoute, 
+  RoutingEngineType, 
+  RealRoadRouteResult 
+} from './routingEngineService';
+
+// In-memory cache of calculated real-road routes from Google Maps Routes API / OSRM
+const LIVE_ROAD_ROUTE_CACHE = new Map<string, RealRoadRouteResult>();
+
+/**
+ * Asynchronously fetches authentic road network route from Google Maps Routes API or OSRM
+ */
+export async function fetchLiveRoadRoute(
+  pickupAddress: string,
+  dropAddress: string,
+  preferredEngine: RoutingEngineType = 'GOOGLE_MAPS_ROUTES_API'
+): Promise<RoadRouteInfo> {
+  const cacheKey = `${pickupAddress.trim().toLowerCase()}_TO_${dropAddress.trim().toLowerCase()}_${preferredEngine}`;
+  
+  try {
+    const realResult = await getRealRoadRoute(pickupAddress, dropAddress, preferredEngine);
+    LIVE_ROAD_ROUTE_CACHE.set(cacheKey, realResult);
+
+    return {
+      pathD: realResult.pathD,
+      points: realResult.canvasPoints,
+      totalDistanceKm: realResult.distanceKm,
+      estimatedTravelTimeMin: realResult.durationMin,
+      pickupAddress,
+      dropAddress,
+      routingEngine: realResult.engine,
+      steps: realResult.steps,
+      isRealRoadEngine: true
+    };
+  } catch (err) {
+    console.warn('Real road routing error, falling back to local geometric graph:', err);
+    return generateActualRoadRoute(pickupAddress, dropAddress);
+  }
+}
+
 // Generates actual multi-segment road route between two junctions
 export function generateActualRoadRoute(pickupAddress: string, dropAddress: string): RoadRouteInfo {
+  // Check if live engine result is already cached
+  const gmpKey = `${pickupAddress.trim().toLowerCase()}_TO_${dropAddress.trim().toLowerCase()}_GOOGLE_MAPS_ROUTES_API`;
+  const osrmKey = `${pickupAddress.trim().toLowerCase()}_TO_${dropAddress.trim().toLowerCase()}_OSRM`;
+  const cached = LIVE_ROAD_ROUTE_CACHE.get(gmpKey) || LIVE_ROAD_ROUTE_CACHE.get(osrmKey);
+
+  if (cached && cached.canvasPoints.length > 0) {
+    return {
+      pathD: cached.pathD,
+      points: cached.canvasPoints,
+      totalDistanceKm: cached.distanceKm,
+      estimatedTravelTimeMin: cached.durationMin,
+      pickupAddress,
+      dropAddress,
+      routingEngine: cached.engine,
+      steps: cached.steps,
+      isRealRoadEngine: true
+    };
+  }
+
   const start = resolveAddressToRoadJunction(pickupAddress);
   const end = resolveAddressToRoadJunction(dropAddress);
 
@@ -107,7 +166,9 @@ export function generateActualRoadRoute(pickupAddress: string, dropAddress: stri
     totalDistanceKm,
     estimatedTravelTimeMin,
     pickupAddress,
-    dropAddress
+    dropAddress,
+    routingEngine: 'GOOGLE_MAPS_ROUTES_API',
+    isRealRoadEngine: false
   };
 }
 

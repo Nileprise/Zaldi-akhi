@@ -5,16 +5,17 @@ import {
   Settings, HelpCircle, Shield, LogOut, Tag, ArrowRight,
   Share2, Users, Sparkles, Navigation, Calendar, Box,
   Package, User, Briefcase, Laptop, AlertTriangle, Scale,
-  Info, Plus, Minus, AlertCircle, ChevronDown, ChevronUp, Receipt
+  Info, Plus, Minus, AlertCircle, ChevronDown, ChevronUp, Receipt, CheckCircle2
 } from 'lucide-react';
 import { 
-  CustomerTab, BookingStatus, Driver, RideOrder, VehicleTier, ServiceMode 
+  CustomerTab, BookingStatus, Driver, RideOrder, VehicleTier, ServiceMode, RoadRouteInfo 
 } from '../types';
 import { 
   VEHICLE_OPTIONS, MOCK_LOCATIONS, MOCK_CARPOOLS, 
   OUTSTATION_PACKAGES, PAST_RIDES_MOCK, INITIAL_DRIVERS 
 } from '../services/mockData';
-import { generateActualRoadRoute } from '../services/routeService';
+import { generateActualRoadRoute, fetchLiveRoadRoute } from '../services/routeService';
+import { RoutingEngineType } from '../services/routingEngineService';
 import { InteractiveMap } from './InteractiveMap';
 import { ChatModal, CallModal, WalletModal, SafetyModal } from './Modals';
 import { sounds } from '../services/audio';
@@ -278,20 +279,55 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     return activeDriver;
   }, [selectedVehicleId, activeDriver]);
 
-  // Actual Road Route between Pickup and Drop
-  const roadRouteInfo = useMemo(() => {
+  // Real Road Routing Engine State (Google Maps Routes API & OSRM)
+  const [routingEngine, setRoutingEngine] = useState<RoutingEngineType>('GOOGLE_MAPS_ROUTES_API');
+  const [liveRoadRoute, setLiveRoadRoute] = useState<RoadRouteInfo | null>(null);
+  const [isLoadingRoadRoute, setIsLoadingRoadRoute] = useState(false);
+  const [showRoadManeuvers, setShowRoadManeuvers] = useState(false);
+
+  // Fallback geometric road route
+  const fallbackRoadRoute = useMemo(() => {
     if (!pickup || !drop) return null;
     return generateActualRoadRoute(pickup, drop);
   }, [pickup, drop]);
 
+  // Fetch authentic road network route from Google Maps Routes API or OSRM
+  useEffect(() => {
+    if (!pickup || !drop) {
+      setLiveRoadRoute(null);
+      setDistanceKm(0);
+      return;
+    }
+    let isMounted = true;
+    setIsLoadingRoadRoute(true);
+
+    fetchLiveRoadRoute(pickup, drop, routingEngine)
+      .then(res => {
+        if (isMounted) {
+          setLiveRoadRoute(res);
+          setIsLoadingRoadRoute(false);
+          if (res.totalDistanceKm > 0) {
+            setDistanceKm(res.totalDistanceKm);
+          }
+        }
+      })
+      .catch(() => {
+        if (isMounted) setIsLoadingRoadRoute(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [pickup, drop, routingEngine]);
+
+  const effectiveRoadRouteInfo = liveRoadRoute || fallbackRoadRoute;
+
   // Sync road route distance - strictly 0 if either pickup or drop is empty
   useEffect(() => {
-    if (pickup && drop && roadRouteInfo) {
-      setDistanceKm(roadRouteInfo.totalDistanceKm);
+    if (pickup && drop && effectiveRoadRouteInfo) {
+      setDistanceKm(effectiveRoadRouteInfo.totalDistanceKm);
     } else if (!pickup || !drop) {
       setDistanceKm(0);
     }
-  }, [pickup, drop, roadRouteInfo]);
+  }, [pickup, drop, effectiveRoadRouteInfo]);
 
   // Extra luggage fee is removed for bike and auto passenger trips
   const extraLuggageFee = 0;
@@ -460,7 +496,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       customerPhone: "+91 98480-12345",
       pickup,
       drop,
-      distanceKm: roadRouteInfo?.totalDistanceKm || (distanceKm > 0 ? distanceKm : 5.8),
+      distanceKm: effectiveRoadRouteInfo?.totalDistanceKm || (distanceKm > 0 ? distanceKm : 5.8),
       fare: rawFare,
       discount: discountAmount,
       finalFare: finalCalculatedFare,
@@ -596,6 +632,13 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             carpoolDriverPos={customerTab === 'CARPOOL' ? (activeCarpoolDriverPos || undefined) : undefined}
             carpoolDriverName={customerTab === 'CARPOOL' ? activeCarpoolDriver?.driverName : undefined}
             isCarpoolActive={customerTab === 'CARPOOL'}
+            routingEngine={routingEngine}
+            onRoutingEngineChange={setRoutingEngine}
+            onSelectDropoffLocation={(newDrop) => {
+              sounds.playSuccess();
+              setDrop(newDrop);
+              recalcDistance(pickup || fixedPinAddress || DEFAULT_GPS_ADDRESS, newDrop);
+            }}
           />
 
           {/* Carpool Live Map Focused Floating Bar */}
@@ -1224,6 +1267,261 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                       )}
 
                       {/* Person mode has no baggage policy or luggage fee */}
+                    </div>
+                  )}
+
+                  {/* ====================================================
+                      CAB CONNECTED ROUTE & AT-ANY-POINT DROP PANEL
+                      When Cab Prime Sedan or Zaldi XL is selected
+                     ==================================================== */}
+                  {(selectedVehicleId === 'CAB' || selectedVehicleId === 'PREMIUM') && (
+                    <div className="space-y-3 p-3.5 bg-gradient-to-br from-white via-slate-50 to-blue-50/40 rounded-2xl border border-blue-200/80 shadow-xs animate-in fade-in">
+                      {/* Real Road Routing Engine Switcher & Status */}
+                      <div className="p-2.5 rounded-xl bg-slate-900 text-white space-y-2 border border-slate-700/80 shadow-md">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-200">
+                              Real Road Routing Engine
+                            </span>
+                          </div>
+                          {isLoadingRoadRoute && (
+                            <span className="text-[9px] text-sky-400 font-bold animate-pulse">
+                              Calculating road route...
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Engine Switcher Buttons */}
+                        <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-slate-800 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playTap();
+                              setRoutingEngine('GOOGLE_MAPS_ROUTES_API');
+                            }}
+                            className={`py-1 px-2 rounded-md text-[10px] font-black transition flex items-center justify-center gap-1 ${
+                              routingEngine === 'GOOGLE_MAPS_ROUTES_API'
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <span>Google Maps Routes</span>
+                            {routingEngine === 'GOOGLE_MAPS_ROUTES_API' && <Check className="w-2.5 h-2.5" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playTap();
+                              setRoutingEngine('OSRM');
+                            }}
+                            className={`py-1 px-2 rounded-md text-[10px] font-black transition flex items-center justify-center gap-1 ${
+                              routingEngine === 'OSRM'
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <span>OSRM Engine</span>
+                            {routingEngine === 'OSRM' && <Check className="w-2.5 h-2.5" />}
+                          </button>
+                        </div>
+
+                        {/* Real Road Distance & Time Banner */}
+                        <div className="flex items-center justify-between text-[11px] pt-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-emerald-400 font-black">
+                              {effectiveRoadRouteInfo?.totalDistanceKm || distanceKm || 8.4} km
+                            </span>
+                            <span className="text-slate-400">·</span>
+                            <span className="text-white font-bold">
+                              ~{effectiveRoadRouteInfo?.estimatedTravelTimeMin || 18} mins driving
+                            </span>
+                          </div>
+
+                          {effectiveRoadRouteInfo?.steps && effectiveRoadRouteInfo.steps.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sounds.playTap();
+                                setShowRoadManeuvers(!showRoadManeuvers);
+                              }}
+                              className="text-[10px] font-bold text-sky-400 hover:text-sky-300 underline flex items-center gap-0.5"
+                            >
+                              <span>{showRoadManeuvers ? 'Hide Steps' : `Steps (${effectiveRoadRouteInfo.steps.length})`}</span>
+                              {showRoadManeuvers ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Turn-by-Turn Steps Drawer */}
+                        {showRoadManeuvers && effectiveRoadRouteInfo?.steps && (
+                          <div className="mt-2 pt-2 border-t border-slate-700/80 max-h-36 overflow-y-auto no-scrollbar space-y-1.5 text-[10px]">
+                            {effectiveRoadRouteInfo.steps.slice(0, 6).map((step: { instruction: string; distanceMeters: number }, idx: number) => (
+                              <div key={idx} className="flex items-start gap-1.5 text-slate-300">
+                                <span className="w-3.5 h-3.5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[8px] font-bold text-slate-400 flex-shrink-0 mt-0.5">
+                                  {idx + 1}
+                                </span>
+                                <div className="flex-1">
+                                  <p className="font-medium text-white">{step.instruction}</p>
+                                  <span className="text-[9px] text-slate-400">
+                                    {step.distanceMeters > 1000 ? `${(step.distanceMeters / 1000).toFixed(1)} km` : `${step.distanceMeters} m`}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-black shadow-2xs">
+                            🚕
+                          </span>
+                          <div>
+                            <span className="text-xs font-black text-slate-900 block leading-tight">
+                              Cab Connected Corridor & Flexible Drop
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              Passenger pickup & destination connected • Drop at any connected stop
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playSuccess();
+                            setCustomerTab('CARPOOL');
+                          }}
+                          className="px-2.5 py-1 rounded-xl bg-[#00875A] hover:bg-emerald-700 text-white text-[10px] font-black transition flex items-center gap-1 shadow-2xs"
+                        >
+                          <span>Open Hub</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Route Match Verification Status Banner */}
+                      <div className="p-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/90 rounded-xl space-y-1 shadow-2xs">
+                        <div className="flex items-center gap-1.5 text-blue-900 font-black text-[11px]">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-700 flex-shrink-0" />
+                          <span>Route Match Verification</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[10px] text-slate-700 font-medium">
+                          <div className="flex items-center gap-1 text-emerald-800 bg-white/80 px-2 py-1 rounded-lg border border-emerald-200">
+                            <Check className="w-3 h-3 text-emerald-600 flex-shrink-0 stroke-[2.5]" />
+                            <span className="font-bold">Pickup does not match rider destination</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-indigo-800 bg-white/80 px-2 py-1 rounded-lg border border-indigo-200">
+                            <Check className="w-3 h-3 text-indigo-600 flex-shrink-0 stroke-[2.5]" />
+                            <span className="font-bold">Passenger dest matches rider destination</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Connected Points Grid */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {/* 1. Passenger Pickup Point Connected */}
+                        <div className="p-2.5 rounded-xl bg-white border border-blue-200 shadow-2xs space-y-0.5">
+                          <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-blue-700">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                            <span>Pickup Point Connected</span>
+                          </div>
+                          <span className="font-black text-slate-900 text-xs block truncate" title={pickup || fixedPinAddress || DEFAULT_GPS_ADDRESS}>
+                            {pickup || fixedPinAddress || DEFAULT_GPS_ADDRESS}
+                          </span>
+                          <span className="text-[9px] text-emerald-700 font-bold block truncate">
+                            ✓ Does not match rider destination
+                          </span>
+                        </div>
+
+                        {/* 2. Destination Connected */}
+                        <div className="p-2.5 rounded-xl bg-white border border-rose-200 shadow-2xs space-y-0.5">
+                          <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-rose-700">
+                            <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+                            <span>Destination Connected</span>
+                          </div>
+                          <span className="font-black text-slate-900 text-xs block truncate" title={drop || 'Hyderabad Central Corridor'}>
+                            {drop || 'Hyderabad Central Corridor'}
+                          </span>
+                          <span className="text-[9px] text-indigo-700 font-bold block truncate">
+                            ✓ Matches rider destination
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 3. At Any Connected Point Drop Selector */}
+                      <div className="pt-2 border-t border-slate-200/80 space-y-2">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-black text-slate-800 flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>At Any Connected Point Drop:</span>
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-500">
+                            Tap any stop to drop there
+                          </span>
+                        </div>
+
+                        {/* Smart Corridor Connected Stops (Urban or Highway Corridor) */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                          {((pickup + drop).toLowerCase().includes('warangal') || (pickup + drop).toLowerCase().includes('kazipet') || (pickup + drop).toLowerCase().includes('jangaon')
+                            ? [
+                                { name: 'Kazipet Link Hub', km: 8.5, eta: '+15m' },
+                                { name: 'Jangaon Bypass (NH 163)', km: 45.0, eta: '+45m' },
+                                { name: 'Aler Tollway Junction', km: 75.0, eta: '+1h 10m' },
+                                { name: 'Bhongir Highway Hub', km: 95.0, eta: '+1h 30m' },
+                                { name: 'Ghatkesar ORR Corridor', km: 115.0, eta: '+1h 50m' },
+                                { name: 'Uppal Metro Hub', km: 130.0, eta: '+2h 05m' },
+                                { name: 'Hyderabad Central Corridor', km: 145.0, eta: '+2h 25m' },
+                                { name: 'Mindspace Hitec IT Park', km: 160.0, eta: '+2h 45m' }
+                              ]
+                            : [
+                                { name: 'Mindspace IT Park Circular Rd', km: 1.8, eta: '+4m' },
+                                { name: 'Hitec City Metro Station', km: 3.4, eta: '+8m' },
+                                { name: 'Inorbit Mall Boulevard', km: 5.2, eta: '+12m' },
+                                { name: 'Cable Bridge Expressway', km: 7.4, eta: '+16m' },
+                                { name: 'Road No. 36 Jubilee Hills', km: 9.8, eta: '+21m' },
+                                { name: 'Road No. 1 Banjara Hills', km: 12.4, eta: '+26m' },
+                                { name: 'Punjagutta Elevated Corridor', km: 14.8, eta: '+31m' },
+                                { name: 'Secunderabad Railway Station', km: 18.5, eta: '+38m' },
+                                { name: 'RGIA Airport Terminal Ramp', km: 29.0, eta: '+45m' }
+                              ]
+                          ).map((stop) => {
+                            const isSelectedDrop = drop?.toLowerCase().includes(stop.name.toLowerCase().split(' ')[0]);
+                            const stopEstFare = Math.max(49, 25 + Math.round(stop.km * 8 * 1.05));
+
+                            return (
+                              <button
+                                key={stop.name}
+                                type="button"
+                                onClick={() => {
+                                  sounds.playSuccess();
+                                  setDrop(stop.name);
+                                  recalcDistance(pickup || fixedPinAddress || DEFAULT_GPS_ADDRESS, stop.name);
+                                }}
+                                className={`flex-shrink-0 px-2.5 py-1.5 rounded-xl text-left border transition flex flex-col min-w-[115px] cursor-pointer ${
+                                  isSelectedDrop
+                                    ? 'bg-rose-50 border-rose-400 text-rose-950 font-black shadow-xs ring-2 ring-rose-300'
+                                    : 'bg-white hover:bg-emerald-50 border-slate-200 hover:border-emerald-300 text-slate-800 shadow-2xs'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between w-full mb-0.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isSelectedDrop ? 'bg-rose-600' : 'bg-slate-400'}`}></span>
+                                  {isSelectedDrop ? (
+                                    <span className="text-[8px] uppercase bg-rose-600 text-white px-1.5 py-0.2 rounded font-black">Drop ✓</span>
+                                  ) : (
+                                    <span className="text-[9px] text-emerald-700 font-black">₹{stopEstFare}</span>
+                                  )}
+                                </div>
+                                <span className="font-bold text-xs truncate w-full" title={stop.name}>{stop.name.split(' (')[0]}</span>
+                                <span className="text-[9px] text-slate-400 truncate w-full">{stop.km} km · {stop.eta}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   )}
 

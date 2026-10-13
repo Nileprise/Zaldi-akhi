@@ -378,6 +378,7 @@ export interface CarpoolRouteStop {
   order: number;
   location: { x: number; y: number };
   eta: string;
+  distanceFromOriginKm?: number;
   isLegallyApprovedStop?: boolean;
   legalStopType?: string; // 'Designated Bus Bay' | 'Metro Kiss-and-Ride' | 'Highway Toll Transit Stop' | 'Airport Commercial Drop'
   legalStopNotes?: string;
@@ -431,11 +432,11 @@ export const ROUTE_MATCHING_SCENARIOS_META: Record<MatchingScenarioCode, {
   },
   S3: {
     name: 'Scenario 3: Exact Destination Match',
-    title: 'Exact Destination Match',
-    shortTag: 'Joined to Terminal',
-    condition: "The Passenger's final destination is exactly the same as the Driver's final destination.",
-    passengerFlow: "The Passenger boards either at the Origin or an intermediate stop, and rides until the very end of the route.",
-    systemAction: "System pairs the ride easily, calculating the fare based on where the Passenger joined the route.",
+    title: 'Destination Matches Rider Destination',
+    shortTag: 'Destination Match',
+    condition: "Passenger pickup location does not match with rider's destination; Passenger destination matches with rider destination.",
+    passengerFlow: "The Passenger boards at an Origin or intermediate stop (not at the destination) and rides to the rider's destination.",
+    systemAction: "System pairs the ride, verifying passenger pickup location does not match rider destination and passenger destination matches rider destination.",
     badgeStyle: {
       bg: 'bg-indigo-50',
       text: 'text-indigo-900',
@@ -594,6 +595,8 @@ export interface MatchingScenarioDetails {
   midRoutePickupEtaMin?: number;
   lastMileDistanceKm?: number;
   freedUpDownstreamSeats?: number;
+  pickupDoesNotMatchRiderDestination?: boolean;
+  destinationMatchesRiderDestination?: boolean;
   badgeStyle: {
     bg: string;
     text: string;
@@ -625,11 +628,14 @@ export interface RouteMatchAnalysis {
   estimatedArrivalMin: number;
   calculatedFare: number;
   remainingSeats: number;
+  availableSeats?: number;
   routeHighlights: string;
   verifiedTransfer?: VerifiedTransferConnection;
   isLegallyVerifiedStop: boolean;
   legalStopBadgeText: string;
   unmatchedReason?: string;
+  pickupDoesNotMatchRiderDestination?: boolean;
+  destinationMatchesRiderDestination?: boolean;
 }
 
 /**
@@ -687,9 +693,13 @@ export function matchDriverRouteToPassenger(
   passengerPickupPos: { x: number; y: number },
   passengerDestPos?: { x: number; y: number } | null,
   passengerDestAddress?: string,
-  bookings: CarpoolSegmentBooking[] = []
+  bookings: CarpoolSegmentBooking[] = [],
+  passengerPickupAddress?: string
 ): RouteMatchAnalysis {
-  const sortedStops = [...driver.corridorStops].sort((a, b) => a.order - b.order);
+  const rawStops = driver.corridorStops || (driver as any).intermediateStops || (driver as any).stops || [];
+  const sortedStops = [...rawStops]
+    .map((s: any, idx: number) => ({ ...s, id: s.id || `stop-${s.order ?? idx}` }))
+    .sort((a, b) => a.order - b.order);
 
   // 1. Calculate road geometry distance from passenger pickup to driver route
   let bestPickupStop = sortedStops[0];
@@ -758,13 +768,34 @@ export function matchDriverRouteToPassenger(
   // If pickup is too far away (> 7.5 km) with no corridor overlap, or driver has passed, mark as NO_MATCH
   const isPickupTooFar = pickupDistanceKm > 7.5;
 
+  const terminalStop = sortedStops[sortedStops.length - 1];
+  const pickupAddressText = (passengerPickupAddress || '').toLowerCase().trim();
+  const terminalStopNameLower = terminalStop.name.toLowerCase().trim();
+
+  // Critical check: Does passenger pickup location match rider's destination?
+  const isPickupMatchingRiderDestination = Boolean(
+    bestPickupStop.order === terminalStop.order ||
+    (bestPickupStop.id && terminalStop.id && bestPickupStop.id === terminalStop.id) ||
+    (pickupAddressText && (
+      pickupAddressText === driverToText ||
+      pickupAddressText.includes(driverToText) ||
+      driverToText.includes(pickupAddressText) ||
+      pickupAddressText.includes(terminalStopNameLower)
+    ) && minPickupDistCanvas <= 4)
+  );
+
   let matchType: RouteMatchType = 'DIRECT';
   let matchTitle = "Direct route match";
   let matchDescription = "Driver's route reaches your destination.";
   let isPartialRoute = false;
   let unmatchedReason: string | undefined;
 
-  if (!passengerDestPos) {
+  if (isPickupMatchingRiderDestination) {
+    matchType = 'NO_MATCH';
+    matchTitle = 'Pickup at Rider Destination';
+    matchDescription = "Passenger pickup location matches rider's destination. Boarding cannot happen at the final destination.";
+    unmatchedReason = "Passenger pickup location matches rider destination. Rider terminates journey at this destination.";
+  } else if (!passengerDestPos) {
     matchType = 'DIRECT';
     matchTitle = 'Direct corridor ride';
     matchDescription = "Departs near your pickup with stops along the highway.";
@@ -856,15 +887,24 @@ export function matchDriverRouteToPassenger(
   // 7. DYNAMIC ROUTE & STOP MATCHING USE CASES (SCENARIOS 1 TO 5)
   // -------------------------------------------------------------------------
   const originStop = sortedStops[0];
-  const terminalStop = sortedStops[sortedStops.length - 1];
 
   // Scenario 1: Exact Origin Match
   // Driver's starting point is identical to Passenger's pickup location
-  const isExactOriginMatch = pickupDistanceKm <= 0.8 || (
-    bestPickupStop.order === 0 && 
-    (driver.from.toLowerCase().includes(bestPickupStop.name.toLowerCase()) || 
-     bestPickupStop.name.toLowerCase().includes(driver.from.toLowerCase()))
+  const distToOriginCanvas = Math.hypot(originStop.location.x - passengerPickupPos.x, originStop.location.y - passengerPickupPos.y);
+  const distToOriginKm = +(distToOriginCanvas * 0.22).toFixed(1);
+  const driverFromLower = driver.from.toLowerCase();
+  const originStopLower = originStop.name.toLowerCase();
+  const isPickupAtOriginName = Boolean(
+    pickupAddressText && (
+      pickupAddressText === driverFromLower ||
+      pickupAddressText.includes(driverFromLower) ||
+      driverFromLower.includes(pickupAddressText) ||
+      pickupAddressText.includes(originStopLower) ||
+      originStopLower.includes(pickupAddressText)
+    )
   );
+
+  const isExactOriginMatch = bestPickupStop.order === 0 && (distToOriginKm <= 1.0 || isPickupAtOriginName);
 
   // Scenario 2: En-Route Pickup & Drop-off Match
   // Driver starts at a different location (order > 0), but route passes directly through pickup
@@ -875,7 +915,7 @@ export function matchDriverRouteToPassenger(
   // Passenger's final destination is exactly the same as Driver's final destination
   const isTerminalDestinationMatch = Boolean(
     passengerDestPos &&
-    bestDropoffStop.id === terminalStop.id &&
+    (bestDropoffStop.order === terminalStop.order || bestDropoffStop.id === terminalStop.id) &&
     (dropoffDistanceKm <= 1.5 || isDirectStopNameMatch || (destText && driverToText.includes(destText)))
   );
 
@@ -981,17 +1021,13 @@ export function matchDriverRouteToPassenger(
     scenario = {
       scenarioCode: 'S3',
       scenarioName: 'Scenario 3: Exact Destination Match',
-      scenarioTitle: 'Exact Destination Match',
-      conditionDescription: `Your destination matches the driver's final destination (${terminalStop.name}).`,
-      passengerFlow: `Board at ${bestPickupStop.name} and ride until the very end of the route (${terminalStop.name}).`,
-      systemAction: `System pairs ride. Fare (₹${calculatedFare}) calculated strictly based on joining waypoint to terminal end.`,
-      badgeStyle: {
-        bg: 'bg-indigo-50',
-        text: 'text-indigo-900',
-        border: 'border-indigo-300',
-        pillBg: 'bg-indigo-600',
-        pillText: 'text-white'
-      }
+      scenarioTitle: 'Destination Matches Rider Destination',
+      conditionDescription: `Passenger pickup location does not match with rider's destination (${terminalStop.name}); Passenger destination matches with rider destination (${terminalStop.name}).`,
+      passengerFlow: `Board at ${bestPickupStop.name} (not at rider destination) and ride until rider destination (${terminalStop.name}).`,
+      systemAction: `System pairs ride to destination. Confirmed passenger pickup location does not match rider destination, and passenger destination matches rider destination. Fare: ₹${calculatedFare}.`,
+      pickupDoesNotMatchRiderDestination: !isPickupMatchingRiderDestination,
+      destinationMatchesRiderDestination: true,
+      badgeStyle: ROUTE_MATCHING_SCENARIOS_META.S3.badgeStyle
     };
   } else if (isEnRoutePickup && matchType === 'DIRECT') {
     scenario = {
@@ -1047,11 +1083,14 @@ export function matchDriverRouteToPassenger(
     estimatedArrivalMin,
     calculatedFare,
     remainingSeats,
+    availableSeats: remainingSeats,
     routeHighlights: `${bestPickupStop.name.split(' ')[0]} → ${bestDropoffStop.name.split(' ')[0]}`,
     verifiedTransfer: transferInfo?.connection,
     isLegallyVerifiedStop,
     legalStopBadgeText,
-    unmatchedReason
+    unmatchedReason,
+    pickupDoesNotMatchRiderDestination: !isPickupMatchingRiderDestination,
+    destinationMatchesRiderDestination: isTerminalDestinationMatch
   };
 }
 
@@ -1073,7 +1112,8 @@ export function recalculateMatchForSelectedStop(
   selectedStopId: string,
   passengerTrueDestination?: string
 ): RouteMatchAnalysis {
-  const sortedStops = [...driver.corridorStops].sort((a, b) => a.order - b.order);
+  const rawStops = driver.corridorStops || (driver as any).intermediateStops || (driver as any).stops || [];
+  const sortedStops = [...rawStops].sort((a, b) => a.order - b.order);
   const selectedStop = sortedStops.find(s => s.id === selectedStopId) || originalMatch.dropoffStop;
   const originStop = sortedStops[0];
   const terminalStop = sortedStops[sortedStops.length - 1];
@@ -1134,10 +1174,12 @@ export function recalculateMatchForSelectedStop(
     scenario = {
       scenarioCode: 'S3',
       scenarioName: 'Scenario 3: Exact Destination Match',
-      scenarioTitle: 'Exact Destination Match',
-      conditionDescription: `Passenger's final destination matches Driver's final destination (${terminalStop.name}).`,
-      passengerFlow: `Board at ${pickupStop.name} (Origin or intermediate waypoint) and ride until the very end of the route (${terminalStop.name}).`,
-      systemAction: `System pairs ride easily, calculating fare (₹${recalculatedFare}) strictly based on joining waypoint (${pickupStop.name}) to terminal end.`,
+      scenarioTitle: 'Destination Matches Rider Destination',
+      conditionDescription: `Passenger pickup location does not match with rider's destination (${terminalStop.name}); Passenger destination matches with rider destination (${terminalStop.name}).`,
+      passengerFlow: `Board at ${pickupStop.name} (does not match rider destination) and ride until rider destination (${terminalStop.name}).`,
+      systemAction: `System pairs ride easily: Passenger pickup location does not match rider destination, and passenger destination matches rider destination. Fare: ₹${recalculatedFare}.`,
+      pickupDoesNotMatchRiderDestination: pickupStop.id !== terminalStop.id,
+      destinationMatchesRiderDestination: true,
       badgeStyle: ROUTE_MATCHING_SCENARIOS_META.S3.badgeStyle
     };
     matchType = 'DIRECT';

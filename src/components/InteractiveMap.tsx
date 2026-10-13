@@ -6,14 +6,16 @@ import {
   Search, X
 } from 'lucide-react';
 import boyPinImage from '../assets/images/boy_3d_pin_transparent.png';
-import { BookingStatus, RoutePoint } from '../types';
+import { BookingStatus, RoutePoint, RoadRouteInfo } from '../types';
 import { 
   generateActualRoadRoute, 
   generateDriverToPickupRoute, 
   getPointAlongRoad, 
   calculateAutoBoundingBox,
-  resolveAddressToRoadJunction 
+  resolveAddressToRoadJunction,
+  fetchLiveRoadRoute
 } from '../services/routeService';
+import { RoutingEngineType } from '../services/routingEngineService';
 import { AnimatedLocationPin, PinStyleType } from './AnimatedLocationPin';
 import { LiveMapVehicleMarker, Destination3dPin } from './Vehicle3dIcon';
 import { 
@@ -62,6 +64,10 @@ interface InteractiveMapProps {
   carpoolDriverPos?: { x: number; y: number; headingDeg: number };
   carpoolDriverName?: string;
   isCarpoolActive?: boolean;
+  // Real Road Routing Engine props
+  routingEngine?: RoutingEngineType;
+  onRoutingEngineChange?: (engine: RoutingEngineType) => void;
+  onSelectDropoffLocation?: (addr: string) => void;
 }
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
@@ -90,7 +96,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   carpoolStops,
   carpoolDriverPos,
   carpoolDriverName,
-  isCarpoolActive = false
+  isCarpoolActive = false,
+  routingEngine = 'GOOGLE_MAPS_ROUTES_API',
+  onRoutingEngineChange,
+  onSelectDropoffLocation
 }) => {
   // Container ref for client bounding rect
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -444,11 +453,42 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     return resolveAddressToRoadJunction(drop);
   }, [drop]);
 
-  // 2. Generate actual multi-segment road route between Pickup and Destination
+  // 2. Real Road Routing Engine Integration (Google Maps Routes API & OSRM)
+  const [liveRealRoute, setLiveRealRoute] = useState<RoadRouteInfo | null>(null);
+  const [isCalculatingLiveRoute, setIsCalculatingLiveRoute] = useState(false);
+  const [showManeuversDrawer, setShowManeuversDrawer] = useState(false);
+
+  // Synchronous initial fallback route
   const roadRoute = useMemo(() => {
     if (!pickup || !drop) return null;
     return generateActualRoadRoute(pickup, drop);
   }, [pickup, drop]);
+
+  // Fetch authentic road network route whenever pickup, drop or routingEngine changes
+  useEffect(() => {
+    if (!pickup || !drop) {
+      setLiveRealRoute(null);
+      return;
+    }
+    let isCancelled = false;
+    setIsCalculatingLiveRoute(true);
+
+    fetchLiveRoadRoute(pickup, drop, routingEngine)
+      .then(res => {
+        if (!isCancelled) {
+          setLiveRealRoute(res);
+          setIsCalculatingLiveRoute(false);
+        }
+      })
+      .catch(err => {
+        console.warn('Real road routing error, using fallback:', err);
+        if (!isCancelled) setIsCalculatingLiveRoute(false);
+      });
+
+    return () => { isCancelled = true; };
+  }, [pickup, drop, routingEngine]);
+
+  const effectiveRoadRoute = liveRealRoute || roadRoute;
 
   // Carpool Corridor Road Route SVG Path
   const carpoolCorridorSvgPath = useMemo(() => {
@@ -489,11 +529,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     if (isDriverArrived) {
       return { x: pickupJunction.x, y: pickupJunction.y, bearingDeg: 0 };
     }
-    if (isTripInProgress && roadRoute) {
+    if (isTripInProgress && effectiveRoadRoute) {
       const fraction = Math.min(1, Math.max(0, progressPercent / 100));
-      return getPointAlongRoad(roadRoute.points, fraction);
+      return getPointAlongRoad(effectiveRoadRoute.points, fraction);
     }
-    if (isTripFinished && roadRoute) {
+    if (isTripFinished && effectiveRoadRoute) {
       return { x: dropJunction.x, y: dropJunction.y, bearingDeg: 0 };
     }
     return { x: initialDriverPos.x, y: initialDriverPos.y, bearingDeg: 0 };
@@ -506,23 +546,23 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     driverToPickupRoute, 
     pickupJunction, 
     dropJunction, 
-    roadRoute, 
+    effectiveRoadRoute, 
     initialDriverPos
   ]);
 
   // 5. Automatic Map Bounding Box / Auto-Zoom adjustment
   const autoBox = useMemo(() => {
-    if (!roadRoute) {
+    if (!effectiveRoadRoute) {
       return { centerX: mapCenter.x, centerY: mapCenter.y, scale: 1 };
     }
     return calculateAutoBoundingBox(
-      roadRoute.points, 
+      effectiveRoadRoute.points, 
       (isDriverApproaching || isTripInProgress) ? liveDriverState : null
     );
-  }, [roadRoute, mapCenter, isDriverApproaching, isTripInProgress, liveDriverState]);
+  }, [effectiveRoadRoute, mapCenter, isDriverApproaching, isTripInProgress, liveDriverState]);
 
   // Effective zoom (manual overrides auto if user pinched/wheeled)
-  const currentZoom = userZoom !== null ? userZoom : (roadRoute ? autoBox.scale : 1);
+  const currentZoom = userZoom !== null ? userZoom : (effectiveRoadRoute ? autoBox.scale : 1);
 
   // Pan offsets: When IDLE, center is exactly mapCenter so that map moves underneath fixed screen center pin!
   const panX = status === 'IDLE' 
@@ -971,11 +1011,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           )}
 
           {/* 1. ACTUAL ROAD ROUTE: PICKUP -> DESTINATION (With Vehicle Tier Specific Styling & Thick White Casing) */}
-          {roadRoute && (
+          {effectiveRoadRoute && (
             <>
               {/* Thick White Casing (Dual-stroke aesthetic like carpool highway) */}
               <path
-                d={roadRoute.pathD}
+                d={effectiveRoadRoute.pathD}
                 fill="none"
                 stroke={baseLayerStyle === 'night' ? '#1e293b' : '#FFFFFF'}
                 strokeWidth={selectedTierPathStyle.casingWidth}
@@ -985,7 +1025,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               />
               {/* Outer Glow Halo Outline */}
               <path
-                d={roadRoute.pathD}
+                d={effectiveRoadRoute.pathD}
                 fill="none"
                 stroke={selectedTierPathStyle.glowColor}
                 strokeWidth={selectedTierPathStyle.glowWidth}
@@ -996,7 +1036,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               />
               {/* Main Vivid Colored Road Route */}
               <path
-                d={roadRoute.pathD}
+                d={effectiveRoadRoute.pathD}
                 fill="none"
                 stroke={selectedTierPathStyle.gradUrl}
                 strokeWidth={selectedTierPathStyle.strokeWidth}
@@ -1005,7 +1045,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               />
               {/* Dashed animated flow line inside route */}
               <path
-                d={roadRoute.pathD}
+                d={effectiveRoadRoute.pathD}
                 fill="none"
                 stroke="#ffffff"
                 strokeWidth={selectedTierPathStyle.dashWidth}
@@ -1019,7 +1059,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           )}
 
           {/* 1B. PREVIEW CORRIDOR PATH FOR SELECTED VEHICLE TIER (BIKE, AUTO, CAB, ZALDI XL, MINI TRUCK) */}
-          {!roadRoute && !isCarpoolActive && (
+          {!effectiveRoadRoute && !isCarpoolActive && (
             <>
               {/* Thick White Casing */}
               <path
@@ -1364,8 +1404,96 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
       </div>
 
+      {/* 🛣️ REAL ROAD ENGINE STATUS & CONTROLS HUD (Google Maps Routes API / OSRM) */}
+      {effectiveRoadRoute && (
+        <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-40 max-w-[94%] w-auto pointer-events-auto">
+          <div className="flex items-center gap-1.5 p-1.5 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl text-xs text-white">
+            {/* Engine Indicator & Selector */}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-slate-800 border border-slate-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-black text-[11px] tracking-tight">
+                {effectiveRoadRoute.routingEngine === 'OSRM' ? 'OSRM Road Engine' : 'Google Maps Routes API'}
+              </span>
+              {isCalculatingLiveRoute && (
+                <span className="text-[9px] text-sky-400 animate-pulse">syncing...</span>
+              )}
+            </div>
+
+            {/* Engine Switcher Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                sounds.playPop();
+                const nextEngine = effectiveRoadRoute.routingEngine === 'OSRM' ? 'GOOGLE_MAPS_ROUTES_API' : 'OSRM';
+                onRoutingEngineChange?.(nextEngine);
+              }}
+              title="Toggle between Google Maps Routes API and OSRM Road Engine"
+              className="px-2 py-1 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-[10px] transition active:scale-95 flex items-center gap-1 shadow-xs"
+            >
+              <RotateCcw className="w-2.5 h-2.5" />
+              <span>Switch</span>
+            </button>
+
+            {/* Real Road Metrics */}
+            <div className="flex items-center gap-1.5 px-1.5 text-[11px] font-bold text-slate-300">
+              <span className="text-emerald-400 font-black">{effectiveRoadRoute.totalDistanceKm} km</span>
+              <span>•</span>
+              <span className="text-white font-black">~{effectiveRoadRoute.estimatedTravelTimeMin} min</span>
+            </div>
+
+            {/* Maneuvers Toggle Button */}
+            {effectiveRoadRoute.steps && effectiveRoadRoute.steps.length > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sounds.playTap();
+                  setShowManeuversDrawer(!showManeuversDrawer);
+                }}
+                className={`px-2 py-1 rounded-xl text-[10px] font-bold transition flex items-center gap-1 ${
+                  showManeuversDrawer
+                    ? 'bg-amber-500 text-slate-950 font-black'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <Navigation className="w-2.5 h-2.5" />
+                <span>Steps ({effectiveRoadRoute.steps.length})</span>
+              </button>
+            )}
+          </div>
+
+          {/* Turn-by-turn maneuvers drawer */}
+          {showManeuversDrawer && effectiveRoadRoute.steps && (
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="mt-1.5 w-full max-h-48 overflow-y-auto no-scrollbar bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-2xl p-2.5 shadow-2xl text-[11px] text-slate-200 space-y-1.5 animate-in fade-in slide-in-from-top-2"
+            >
+              <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-800">
+                <span>Real Road Turn-by-Turn Steps</span>
+                <span className="text-emerald-400">{effectiveRoadRoute.routingEngine}</span>
+              </div>
+              {effectiveRoadRoute.steps.slice(0, 8).map((st, idx) => (
+                <div key={idx} className="flex items-start gap-2 py-1 border-b border-slate-800/60 last:border-0">
+                  <span className="w-4 h-4 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[9px] font-black text-slate-400 flex-shrink-0 mt-0.5">
+                    {idx + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-white leading-tight">{st.instruction}</p>
+                    <div className="flex items-center gap-2 text-[9px] text-slate-400 mt-0.5">
+                      <span>{st.distanceMeters > 1000 ? `${(st.distanceMeters / 1000).toFixed(1)} km` : `${st.distanceMeters} m`}</span>
+                      {st.durationSeconds > 0 && <span>· ~{Math.max(1, Math.round(st.durationSeconds / 60))} min</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 📍 ANIMATED LOCATION PIN (STAYS FIXED ON SCREEN WHILE MAP MOVES UNDERNEATH) */}
-      {showFixedPin && !isCarpoolActive && status === 'IDLE' && !drop && !roadRoute && (
+      {showFixedPin && !isCarpoolActive && status === 'IDLE' && !drop && !effectiveRoadRoute && (
         <div 
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[88%] z-40 pointer-events-none select-none flex flex-col items-center"
         >
@@ -1402,7 +1530,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </button>
 
         {/* 2. PIN STYLE CYCLE BUTTON */}
-        {status === 'IDLE' && !drop && !roadRoute && (
+        {status === 'IDLE' && !drop && !effectiveRoadRoute && (
           <button 
             onClick={handleCyclePinStyle}
             title={`Pin Style: ${activePinStyle}`}
@@ -1583,7 +1711,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       )}
 
       {/* “CONFIRM LOCATION” FLOATING ACTION BUTTON ON MAP (WHEN PICKING PICKUP) */}
-      {status === 'IDLE' && !drop && !roadRoute && (
+      {status === 'IDLE' && !drop && !effectiveRoadRoute && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 w-[90%] max-w-xs pointer-events-auto">
           <button
             onClick={(e) => {

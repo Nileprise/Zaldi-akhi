@@ -36,6 +36,9 @@ export interface RoadRouteInfo {
   estimatedTravelTimeMin: number;
   pickupAddress: string;
   dropAddress: string;
+  routingEngine?: 'GOOGLE_MAPS_ROUTES_API' | 'OSRM';
+  steps?: Array<{ instruction: string; distanceMeters: number; durationSeconds: number }>;
+  isRealRoadEngine?: boolean;
 }
 
 export interface VehicleTier {
