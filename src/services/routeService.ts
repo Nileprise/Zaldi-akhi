@@ -229,7 +229,7 @@ export function getPointAlongRoad(points: RoutePoint[], fraction: number): {
       const x = p1.x + (p2.x - p1.x) * segT;
       const y = p1.y + (p2.y - p1.y) * segT;
       const angleRad = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-      const bearingDeg = (angleRad * 180) / Math.PI;
+      const bearingDeg = ((angleRad * 180) / Math.PI) + 90;
       return { x, y, bearingDeg };
     }
     accumulated += segLen;

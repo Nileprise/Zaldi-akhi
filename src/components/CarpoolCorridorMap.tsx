@@ -1,33 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Check, Crosshair, MapPin } from 'lucide-react';
 import { sounds } from '../services/audio';
-import cab3dImage from '../assets/images/cab_3d_transparent.png';
+import { renderVectorVehicleSvg, getVehicleTheme } from './Vehicle5dIcon';
 
 interface CarpoolCorridorMapProps {
   pickupAddress: string;
   dropoffAddress: string;
+  driverId?: string;
   driverName?: string;
   driverProgress?: number;
+  vehicleTier?: string;
+  vehiclePlate?: string;
+  vehicleModel?: string;
+  liveSpeedKmh?: number;
   onRecenter?: () => void;
 }
 
 export const CarpoolCorridorMap: React.FC<CarpoolCorridorMapProps> = ({
   pickupAddress,
   dropoffAddress,
+  driverId,
   driverName = 'Ramesh Kumar',
   driverProgress = 0.42,
+  vehicleTier = 'Cab Prime Sedan',
+  vehiclePlate = 'TS 09 AB 1234',
+  vehicleModel = 'Maruti Ertiga',
+  liveSpeedKmh = 68,
   onRecenter
 }) => {
   // Animated vehicle progress along the highway
   const [carAnimProgress, setCarAnimProgress] = useState(driverProgress);
+  const lastDriverKeyRef = useRef<string>(driverId || driverName);
+  const [hasRecentlyChangedDriver, setHasRecentlyChangedDriver] = useState(false);
 
+  // Immediately jump to the selected driver's live current car location whenever rider selection changes
+  useEffect(() => {
+    const currentKey = driverId || driverName;
+    if (lastDriverKeyRef.current !== currentKey) {
+      lastDriverKeyRef.current = currentKey;
+      if (typeof driverProgress === 'number' && driverProgress >= 0) {
+        setCarAnimProgress(driverProgress);
+        setHasRecentlyChangedDriver(true);
+        const timer = setTimeout(() => setHasRecentlyChangedDriver(false), 1400);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [driverId, driverName, driverProgress]);
+
+  // Smooth forward highway travel progression - strictly forward, zero reverse motion
   useEffect(() => {
     const interval = setInterval(() => {
       setCarAnimProgress(prev => {
-        const next = prev + 0.003;
+        const next = prev + 0.0016;
         return next > 0.94 ? 0.08 : next;
       });
-    }, 120);
+    }, 100);
     return () => clearInterval(interval);
   }, []);
 
@@ -43,20 +70,22 @@ export const CarpoolCorridorMap: React.FC<CarpoolCorridorMapProps> = ({
   // Smooth SVG road curve string
   const roadPathD = "M 195 125 C 240 130, 280 142, 320 155 C 370 172, 420 182, 470 185 C 510 187, 530 184, 550 185 C 585 186, 620 205, 655 220 C 695 238, 745 252, 795 255";
 
+  // Road path points for car trajectory
+  const pts = useMemo(() => [
+    { x: 195, y: 125 }, // Hanamkonda (Start)
+    { x: 320, y: 155 }, // Warangal
+    { x: 440, y: 184 },
+    { x: 550, y: 185 }, // Ghatkesar
+    { x: 655, y: 220 }, // Uppal
+    { x: 795, y: 255 }  // Hyderabad Central (End)
+  ], []);
+
   // Calculate car position along the parametric curve
-  // t is normalized progress (0 to 1)
+  // Ensures car moves forward in direction of motion with zero reverse movement
   const getCarPosOnCurve = (t: number) => {
-    // Piecewise approximation across the 5 segments
-    const pts = [
-      { x: 195, y: 125 },
-      { x: 320, y: 155 },
-      { x: 440, y: 184 },
-      { x: 550, y: 185 },
-      { x: 655, y: 220 },
-      { x: 795, y: 255 }
-    ];
     const segmentCount = pts.length - 1;
-    const indexFloat = t * segmentCount;
+    const clampedT = Math.max(0, Math.min(0.999, t));
+    const indexFloat = clampedT * segmentCount;
     const idx = Math.min(segmentCount - 1, Math.floor(indexFloat));
     const frac = indexFloat - idx;
     const p1 = pts[idx];
@@ -64,11 +93,12 @@ export const CarpoolCorridorMap: React.FC<CarpoolCorridorMapProps> = ({
     const curX = p1.x + frac * (p2.x - p1.x);
     const curY = p1.y + frac * (p2.y - p1.y);
     const angleRad = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-    const angleDeg = (angleRad * 180) / Math.PI;
-    return { x: curX, y: curY, angle: angleDeg };
+    const roadAngleDeg = (angleRad * 180) / Math.PI;
+    return { x: curX, y: curY, roadAngleDeg };
   };
 
   const carPos = getCarPosOnCurve(carAnimProgress);
+  const vehicleTheme = getVehicleTheme(vehicleTier);
 
   return (
     <div className="relative w-full h-full overflow-hidden select-none bg-[#F3F4EE]">
@@ -193,24 +223,16 @@ export const CarpoolCorridorMap: React.FC<CarpoolCorridorMapProps> = ({
           return null;
         })}
 
-        {/* Moving Car Marker along the Road */}
-        <g
-          transform={`translate(${carPos.x}, ${carPos.y}) rotate(${carPos.angle})`}
-          className="transition-transform duration-100 ease-linear"
-        >
-          {/* Vehicle Drop Shadow */}
-          <ellipse cx="0" cy="4" rx="20" ry="11" fill="#0F172A" opacity="0.3" filter="blur(2px)" />
-
-          {/* 3D Vehicle Render */}
-          <image
-            href={cab3dImage}
-            x="-22"
-            y="-16"
-            width="44"
-            height="32"
-            preserveAspectRatio="xMidYMid meet"
-          />
-        </g>
+        {/* Subtle SVG ground contact track shadow beneath vehicle */}
+        <ellipse
+          cx={carPos.x}
+          cy={carPos.y + 4}
+          rx="22"
+          ry="10"
+          fill="#0F172A"
+          opacity="0.25"
+          filter="blur(2px)"
+        />
       </svg>
 
       {/* -----------------------------------------------------------------
@@ -272,6 +294,76 @@ export const CarpoolCorridorMap: React.FC<CarpoolCorridorMapProps> = ({
           <span className="font-extrabold text-xs text-slate-900 tracking-tight">Hyderabad Central</span>
         </div>
         <div className="w-2.5 h-2.5 bg-rose-700 rounded-full ring-2 ring-white shadow-xs -mt-1"></div>
+      </div>
+
+      {/* -----------------------------------------------------------------
+          2B. MOVING CARPOOL VEHICLE (FORWARD FACING ALONG ROAD)
+         ----------------------------------------------------------------- */}
+      <div
+        className="absolute z-20 flex flex-col items-center pointer-events-none transform -translate-x-1/2 -translate-y-1/2 transition-all duration-100 ease-linear"
+        style={{
+          left: `${(carPos.x / 1000) * 100}%`,
+          top: `${(carPos.y / 500) * 100}%`
+        }}
+      >
+        {/* 1. Driver Name & Live Speed Pill (Matching Ride Section) */}
+        <div className="mb-1 px-2.5 py-0.5 rounded-full bg-slate-950/95 text-white border border-emerald-400 text-[9px] font-black shadow-xl flex items-center gap-1.5 whitespace-nowrap backdrop-blur-md">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+          <span>{driverName} • {liveSpeedKmh} km/h</span>
+        </div>
+
+        {/* 2. Upright Forward-Facing Vehicle with Wheels on Highway Surface */}
+        <div 
+          className="relative flex items-center justify-center transition-transform duration-100 ease-linear"
+          style={{
+            width: 62,
+            height: 32,
+            transform: `rotate(${carPos.roadAngleDeg}deg)`
+          }}
+        >
+          {/* Visual beacon pulse when selecting a new rider to highlight current car location */}
+          {hasRecentlyChangedDriver && (
+            <div className="absolute inset-0 -m-3 rounded-full border-2 border-emerald-400 animate-ping pointer-events-none" />
+          )}
+
+          {/* Dynamic Forward Headlight Projection Beam (illuminating the road ahead towards Hyderabad Central) */}
+          <div 
+            className="absolute top-1/2 -right-8 -translate-y-1/2 w-11 h-7 pointer-events-none"
+            style={{
+              background: 'radial-gradient(ellipse at left, rgba(254, 240, 138, 0.8) 0%, rgba(253, 224, 71, 0.35) 45%, transparent 75%)',
+              clipPath: 'polygon(0% 30%, 100% 0%, 100% 100%, 0% 70%)',
+              filter: 'blur(1.5px)'
+            }}
+          />
+
+          {/* Neon Ambient Road Underglow Aura matching vehicle tier */}
+          <div 
+            className="absolute inset-x-1 bottom-0 h-3.5 rounded-full blur-[3px] pointer-events-none opacity-50"
+            style={{ backgroundColor: vehicleTheme.glowColor || 'rgba(37, 99, 235, 0.6)' }}
+          />
+
+          {/* Ground Contact Shadow beneath Wheels on Highway Surface */}
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[85%] h-2.5 bg-black/60 rounded-full blur-[1.5px] pointer-events-none" />
+
+          {/* Upright Vector Car Chassis with Headlights pointing forward to the right towards Hyderabad */}
+          <div 
+            className="relative z-10 w-full h-full flex items-center justify-center filter drop-shadow-[0_2px_5px_rgba(0,0,0,0.55)]"
+            style={{
+              transform: (vehicleTier || '').toUpperCase().includes('BIKE') || (vehicleTier || '').toUpperCase().includes('AUTO')
+                ? 'none'
+                : 'scaleX(-1)'
+            }}
+          >
+            {renderVectorVehicleSvg(vehicleTier || 'CAB', false, 'w-full h-full')}
+          </div>
+        </div>
+
+        {/* 3. Driver License Plate Tag (Matching Ride Section) */}
+        <div className="mt-1 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-black/85 text-white text-[8px] font-bold border border-slate-700/80 shadow-md whitespace-nowrap">
+          <span className="text-blue-400 font-semibold">{vehicleTier.replace('Prime', '').replace('Sedan', '').trim() || 'Cab Prime'}</span>
+          <span className="text-slate-500">•</span>
+          <span className="font-mono text-amber-300 font-bold">{vehiclePlate}</span>
+        </div>
       </div>
 
       {/* -----------------------------------------------------------------

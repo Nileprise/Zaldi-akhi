@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Users, MapPin, Navigation, Clock, ShieldCheck, 
-  ArrowRight, Check, AlertTriangle, AlertCircle, Timer, Zap, 
+  ArrowRight, ArrowLeft, Check, AlertTriangle, AlertCircle, Timer, Zap, 
   Car, ChevronRight, ChevronLeft, Sparkles, 
   CheckCircle2, XCircle, SlidersHorizontal, Filter, 
   Star, Compass, Radio, ChevronUp, ChevronDown, X, Bell, Menu,
@@ -9,7 +9,7 @@ import {
   Calendar, Phone, MessageSquare, Award, Leaf, Fuel,
   Info, Shield, CheckCircle, RefreshCw, Copy, CheckCheck,
   Send, AlertOctagon, Plus, Key, Crosshair, Map as MapIcon,
-  Flame, BatteryCharging, RadioTower, Pencil
+  Flame, BatteryCharging, RadioTower, Pencil, Trash2, GripVertical
 } from 'lucide-react';
 import { sounds } from '../services/audio';
 import { 
@@ -415,12 +415,22 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
   const [destinationLocation, setDestinationLocation] = useState(passengerDestination || 'Hyderabad Central');
   const [travelDate, setTravelDate] = useState<'Today, 12 Oct' | 'Tomorrow, 13 Oct'>('Today, 12 Oct');
 
-  // Edit Route Locations Modal & Inline Edit State
+  // Edit Route Locations & Multi-Stop Edit State
   const [showEditLocationsModal, setShowEditLocationsModal] = useState(false);
   const [isInlineEditing, setIsInlineEditing] = useState(false);
-  const [editPickupDraft, setEditPickupDraft] = useState(currentAddress || 'Hanamkonda, Warangal');
-  const [editDropoffDraft, setEditDropoffDraft] = useState(passengerDestination || 'Hyderabad Central');
-  const [activeEditField, setActiveEditField] = useState<'PICKUP' | 'DROPOFF'>('PICKUP');
+  const [editPickupDraft, setEditPickupDraft] = useState('Mindspace IT Park Circular Rd, Madhapur');
+  const [editDropoffDraft, setEditDropoffDraft] = useState('Hyderabad');
+  const [activeEditField, setActiveEditField] = useState<'PICKUP' | 'DROPOFF' | string>('PICKUP');
+  const [editIntermediateStopsDraft, setEditIntermediateStopsDraft] = useState<Array<{
+    id: string;
+    name: string;
+    eta?: string;
+    legalStopType?: string;
+  }>>([
+    { id: 'stop-kz', name: 'Kazipet', eta: '+30 mins', legalStopType: 'Railway Bay' },
+    { id: 'stop-ghat', name: 'Ghatkesar', eta: '+1 hr 15m', legalStopType: 'Highway Tollway' },
+    { id: 'stop-uppal', name: 'Uppal', eta: '+1 hr 45m', legalStopType: 'Metro Interchange' }
+  ]);
 
   // GPS Live State
   const [isGpsActive, setIsGpsActive] = useState(false);
@@ -683,7 +693,7 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
 
   // Scenario counts across all ranked matches
   const scenarioCounts = useMemo(() => {
-    const counts: Record<string, number> = { ALL: rankedDriversWithMatches.length, S1: 0, S2: 0, S3: 0, S4: 0, S5: 0 };
+    const counts: Record<string, number> = { ALL: rankedDriversWithMatches.length, S1: 0, S2: 0, S4: 0, S5: 0 };
     rankedDriversWithMatches.forEach(d => {
       d.match.applicableScenarios.forEach(sc => {
         if (sc !== 'NONE') {
@@ -697,20 +707,23 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
     return counts;
   }, [rankedDriversWithMatches]);
 
-  // Filtered drivers by category and scenario
+  // Authoritative Filtered drivers: Only rides with real road verified matching and available seats
   const displayedDrivers = useMemo(() => {
-    let list = rankedDriversWithMatches;
+    // 1. Authoritative check: Must be a verified compatible corridor ride with available seats
+    let list = rankedDriversWithMatches.filter(d => 
+      d.match.matchType !== 'NO_MATCH' && d.availableSeatsCount > 0
+    );
+
+    // Fallback if passenger destination is broad or corridor-wide
+    if (list.length === 0) {
+      list = rankedDriversWithMatches.filter(d => d.availableSeatsCount > 0);
+    }
+
     if (selectedFilterCategory !== 'ALL') {
       list = list.filter(d => d.match.matchType === selectedFilterCategory);
     }
-    if (selectedScenarioFilter !== 'ALL') {
-      list = list.filter(d => 
-        d.match.scenario.scenarioCode === selectedScenarioFilter ||
-        d.match.applicableScenarios.includes(selectedScenarioFilter)
-      );
-    }
     return list;
-  }, [rankedDriversWithMatches, selectedFilterCategory, selectedScenarioFilter]);
+  }, [rankedDriversWithMatches, selectedFilterCategory]);
 
   // Active driver object
   const activeDriverWrapper = useMemo(() => {
@@ -756,12 +769,81 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
   };
 
   // Open edit modal pre-seeded with current values
-  const handleOpenEditLocationsModal = (initialField: 'PICKUP' | 'DROPOFF' = 'PICKUP') => {
+  const handleOpenEditLocationsModal = (initialField: 'PICKUP' | 'DROPOFF' | string = 'PICKUP') => {
     sounds.playTap();
     setEditPickupDraft(pickupLocation);
     setEditDropoffDraft(destinationLocation);
     setActiveEditField(initialField);
+
+    if (activeDriver?.corridorStops && activeDriver.corridorStops.length > 2) {
+      const intermediateStops = activeDriver.corridorStops.slice(1, -1).map((s, idx) => ({
+        id: s.id || `stop-${idx}-${Date.now()}`,
+        name: s.name,
+        eta: s.eta,
+        legalStopType: s.legalStopType || 'Highway Transit Bay'
+      }));
+      if (intermediateStops.length > 0) {
+        setEditIntermediateStopsDraft(intermediateStops);
+      }
+    }
     setShowEditLocationsModal(true);
+  };
+
+  const handleAddIntermediateStop = (suggestedName?: string) => {
+    sounds.playPop();
+    const newId = `stop-custom-${Date.now()}`;
+    const newStop = {
+      id: newId,
+      name: suggestedName || '',
+      eta: `+${(editIntermediateStopsDraft.length + 1) * 25} mins`,
+      legalStopType: 'Highway Transit Bay'
+    };
+    setEditIntermediateStopsDraft(prev => [...prev, newStop]);
+    setActiveEditField(newId);
+  };
+
+  const handleRemoveIntermediateStop = (id: string) => {
+    sounds.playTap();
+    setEditIntermediateStopsDraft(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleMoveStopUp = (index: number) => {
+    if (index <= 0) return;
+    sounds.playTap();
+    setEditIntermediateStopsDraft(prev => {
+      const arr = [...prev];
+      const temp = arr[index - 1];
+      arr[index - 1] = arr[index];
+      arr[index] = temp;
+      return arr;
+    });
+  };
+
+  const handleMoveStopDown = (index: number) => {
+    if (index >= editIntermediateStopsDraft.length - 1) return;
+    sounds.playTap();
+    setEditIntermediateStopsDraft(prev => {
+      const arr = [...prev];
+      const temp = arr[index + 1];
+      arr[index + 1] = arr[index];
+      arr[index] = temp;
+      return arr;
+    });
+  };
+
+  const handleUpdateIntermediateStopName = (id: string, name: string) => {
+    setEditIntermediateStopsDraft(prev => prev.map(s => s.id === id ? { ...s, name } : s));
+  };
+
+  const handleResetDefaultCorridorStops = () => {
+    sounds.playPop();
+    setEditPickupDraft('Mindspace IT Park Circular Rd, Madhapur');
+    setEditDropoffDraft('Hyderabad');
+    setEditIntermediateStopsDraft([
+      { id: 'stop-kz', name: 'Kazipet', eta: '+30 mins', legalStopType: 'Railway Bay' },
+      { id: 'stop-ghat', name: 'Ghatkesar', eta: '+1 hr 15m', legalStopType: 'Highway Tollway' },
+      { id: 'stop-uppal', name: 'Uppal', eta: '+1 hr 45m', legalStopType: 'Metro Interchange' }
+    ]);
   };
 
   // Apply edits to live state and notify parent callbacks
@@ -774,6 +856,58 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
     onUpdatePickupLocation?.(finalPickup);
     onSelectDropoffLocation?.(finalDropoff);
     setSelectedDropPointId(null);
+
+    const validIntermediates = editIntermediateStopsDraft.filter(s => s.name.trim() !== '');
+
+    if (selectedDriverId) {
+      setLiveDrivers(prev => prev.map(driver => {
+        if (driver.id === selectedDriverId) {
+          const newCorridorStops: CarpoolRouteStop[] = [
+            {
+              id: `${driver.id}-pickup`,
+              name: finalPickup,
+              order: 0,
+              location: { x: 75, y: 42 },
+              eta: '07:30 AM (Pickup)',
+              isLegallyApprovedStop: true,
+              legalStopType: 'Designated Bus Bay'
+            },
+            ...validIntermediates.map((s, idx) => ({
+              id: s.id || `${driver.id}-stop-${idx + 1}`,
+              name: s.name,
+              order: idx + 1,
+              location: {
+                x: Math.round(75 - ((75 - 50) * (idx + 1) / (validIntermediates.length + 1))),
+                y: Math.round(42 - ((42 - 36) * (idx + 1) / (validIntermediates.length + 1)))
+              },
+              eta: s.eta || `+${(idx + 1) * 25}m`,
+              isLegallyApprovedStop: true,
+              legalStopType: s.legalStopType || 'Highway Transit Bay'
+            })),
+            {
+              id: `${driver.id}-destination`,
+              name: finalDropoff,
+              order: validIntermediates.length + 1,
+              location: { x: 50, y: 36 },
+              eta: '10:30 AM (Destination)',
+              isLegallyApprovedStop: true,
+              legalStopType: 'Central Transit Hub'
+            }
+          ];
+
+          const stopNames = [finalPickup, ...validIntermediates.map(s => s.name), finalDropoff];
+          return {
+            ...driver,
+            from: finalPickup,
+            to: finalDropoff,
+            corridorStops: newCorridorStops,
+            corridorSummary: stopNames.join(' → ')
+          };
+        }
+        return driver;
+      }));
+    }
+
     setShowEditLocationsModal(false);
     setIsInlineEditing(false);
   };
@@ -783,6 +917,7 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
     const temp = editPickupDraft;
     setEditPickupDraft(editDropoffDraft);
     setEditDropoffDraft(temp);
+    setEditIntermediateStopsDraft(prev => [...prev].reverse());
   };
 
   const handleSelectQuickDestination = (dest: string) => {
@@ -842,15 +977,6 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
       setSelectedDropPointId('stop-r4');
       onUpdatePickupLocation?.('Ghatkesar');
       onSelectDropoffLocation?.('Uppal Metro Hub');
-    } else if (scenarioCode === 'S3') {
-      // Scenario 3: Exact Destination Match
-      // Passenger final destination is exactly the same as driver final destination (Hyderabad Central)
-      setPickupLocation('Uppal Metro Hub');
-      setDestinationLocation('Hyderabad Central');
-      setSelectedDriverId('pool-ramesh');
-      setSelectedDropPointId('stop-r5');
-      onUpdatePickupLocation?.('Uppal Metro Hub');
-      onSelectDropoffLocation?.('Hyderabad Central');
     } else if (scenarioCode === 'S4') {
       // Scenario 4: Intermediate Stop as Destination
       // Driver final destination is further along (Hyderabad), passenger destination matches intermediate stop (Uppal)
@@ -1367,13 +1493,6 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
                       <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
                       <span>How Highway Carpooling Works</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowScenarioGuideModal(true)}
-                      className="text-[10px] font-extrabold text-emerald-700 hover:underline bg-white px-2 py-0.5 rounded-full border border-emerald-200 shadow-2xs"
-                    >
-                      5 Scenarios Guide →
-                    </button>
                   </div>
 
                   <div className="grid grid-cols-3 gap-1.5 text-center">
@@ -1824,10 +1943,15 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
           {/* 2. REAL ROAD ROUTE MAP (Upper 52%) */}
           <div className="h-[50%] sm:h-[53%] w-full relative overflow-hidden">
             <CarpoolCorridorMap
+              driverId={selectedDriver?.id}
               pickupAddress={pickupLocation}
               dropoffAddress={destinationLocation}
-              driverName={selectedDriver?.driverName}
+              driverName={selectedDriver?.driverName || 'Ramesh Kumar'}
               driverProgress={selectedDriver?.driverProgress || 0.42}
+              vehicleTier={selectedDriver?.vehicleTier || 'Cab Prime Sedan'}
+              vehiclePlate={selectedDriver?.vehiclePlate || 'TS 09 AB 1234'}
+              vehicleModel={selectedDriver?.vehicle || 'Maruti Ertiga'}
+              liveSpeedKmh={selectedDriver?.liveSpeedKmh || 68}
               onRecenter={handleDetectLiveGps}
             />
           </div>
@@ -1857,72 +1981,6 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
               </div>
             </div>
 
-            {/* Quick Scenario Simulator Pills + Automated Test Suite Access */}
-            <div className="px-4 py-1.5 bg-slate-50 border-y border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-shrink-0">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex-shrink-0 mr-0.5">Scenarios:</span>
-              <button
-                onClick={() => { sounds.playTap(); setShowAutomatedTestSuiteModal(true); if (!testSuiteResults) handleRunAllTests(); }}
-                className="px-2 py-1 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 rounded-lg text-[10px] font-black whitespace-nowrap flex items-center gap-1 transition shadow-2xs"
-                title="Run automated tests for all 5 scenarios"
-              >
-                <Sparkles className="w-3 h-3 text-amber-600" />
-                <span>Tests (7/7 Passed)</span>
-              </button>
-              <button
-                onClick={() => handleSimulateScenario('S1')}
-                className={`px-2 py-1 rounded-lg text-[10px] font-black whitespace-nowrap flex items-center gap-1 transition ${
-                  selectedScenarioFilter === 'S1' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <Zap className="w-2.5 h-2.5" />
-                <span>S1: Origin</span>
-              </button>
-              <button
-                onClick={() => handleSimulateScenario('S2')}
-                className={`px-2 py-1 rounded-lg text-[10px] font-black whitespace-nowrap flex items-center gap-1 transition ${
-                  selectedScenarioFilter === 'S2' ? 'bg-blue-600 text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <Timer className="w-2.5 h-2.5" />
-                <span>S2: En-Route</span>
-              </button>
-              <button
-                onClick={() => handleSimulateScenario('S3')}
-                className={`px-2 py-1 rounded-lg text-[10px] font-black whitespace-nowrap flex items-center gap-1 transition ${
-                  selectedScenarioFilter === 'S3' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <ArrowRight className="w-2.5 h-2.5" />
-                <span>S3: Dest Match</span>
-              </button>
-              <button
-                onClick={() => handleSimulateScenario('S4')}
-                className={`px-2 py-1 rounded-lg text-[10px] font-black whitespace-nowrap flex items-center gap-1 transition ${
-                  selectedScenarioFilter === 'S4' ? 'bg-teal-600 text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <CheckCircle2 className="w-2.5 h-2.5" />
-                <span>S4: Intermediate</span>
-              </button>
-              <button
-                onClick={() => handleSimulateScenario('S5')}
-                className={`px-2 py-1 rounded-lg text-[10px] font-black whitespace-nowrap flex items-center gap-1 transition ${
-                  selectedScenarioFilter === 'S5' ? 'bg-amber-600 text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <Compass className="w-2.5 h-2.5" />
-                <span>S5: Partial</span>
-              </button>
-              <button
-                onClick={() => handleSimulateScenario('ERR' as any)}
-                className="px-2 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-800 rounded-lg text-[10px] font-black whitespace-nowrap flex items-center gap-1 transition"
-                title="Test Error: Pickup = Dest"
-              >
-                <AlertOctagon className="w-2.5 h-2.5 text-rose-600" />
-                <span>ERR: Pickup = Dest</span>
-              </button>
-            </div>
-
             {/* Real-time Mismatch Alert Banner (if pickup = rider destination) */}
             {Boolean(
               (pickupLocation.toLowerCase().trim().includes('hyderabad central') && destinationLocation.toLowerCase().trim().includes('hyderabad central')) ||
@@ -1938,12 +1996,6 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
                   <p className="text-[11px] text-rose-800 leading-snug">
                     Passenger cannot board at the trip termination point ({selectedDriver?.to || 'Hyderabad Central'}).
                   </p>
-                  <button
-                    onClick={() => handleSimulateScenario('S3')}
-                    className="mt-1 px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold cursor-pointer"
-                  >
-                    Fix via S3 (Uppal Boarding)
-                  </button>
                 </div>
               </div>
             )}
@@ -1953,8 +2005,8 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
               {displayedDrivers.length === 0 && (
                 <div className="text-center py-8 space-y-2">
                   <AlertCircle className="w-8 h-8 text-slate-400 mx-auto" />
-                  <div className="text-xs font-black text-slate-700">No rides in this scenario filter</div>
-                  <p className="text-[11px] text-slate-500">Select "All Scenarios" or click one of the simulator presets above.</p>
+                  <div className="text-xs font-black text-slate-700">No matching rides found</div>
+                  <p className="text-[11px] text-slate-500">Check nearby corridor stops or adjust your departure time.</p>
                 </div>
               )}
 
@@ -1967,12 +2019,23 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
                 const boardName = pickupLocation.split(',')[0] || driver.corridorStops[1]?.name || 'Hanamkonda';
                 const destName = (destinationLocation.includes('Hyderabad') ? 'Hyderabad' : destinationLocation.split(' ')[0]) || driver.to;
 
+                const isSelected = selectedDriverId === driver.id;
+
                 return (
                   <div
                     key={driver.id}
-                    className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm space-y-3 relative overflow-hidden transition hover:shadow-md"
+                    onClick={() => {
+                      sounds.playTap();
+                      setSelectedDriverId(driver.id);
+                      setSelectedDropPointId(match.dropoffStop.id);
+                    }}
+                    className={`bg-white rounded-3xl p-4 border transition cursor-pointer relative overflow-hidden ${
+                      isSelected 
+                        ? 'border-emerald-500 ring-2 ring-emerald-500/30 shadow-md bg-emerald-50/15' 
+                        : 'border-slate-200/90 shadow-sm hover:border-slate-300 hover:shadow-md'
+                    }`}
                   >
-                    {/* Top Row: Driver Avatar, Info, and Best Match Badge */}
+                    {/* Top Row: Driver Avatar, Info, and Status Badge */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
                         {/* Avatar with green active badge overlay */}
@@ -2000,17 +2063,26 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
                         </div>
                       </div>
 
-                      {/* Best Match Badge */}
-                      {isBestMatch ? (
-                        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black flex items-center gap-1 flex-shrink-0">
-                          <Zap className="w-3.5 h-3.5 fill-emerald-700 text-emerald-700" />
-                          <span>Best Match</span>
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black text-slate-600 bg-slate-100 flex-shrink-0">
-                          {match.matchTitle}
-                        </span>
-                      )}
+                      {/* Best Match or Showing on Map Badge */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {isSelected && (
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center gap-1 shadow-xs animate-in fade-in">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                            <span>Showing on Map</span>
+                          </span>
+                        )}
+                        {isBestMatch && !isSelected && (
+                          <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black flex items-center gap-1 flex-shrink-0">
+                            <Zap className="w-3.5 h-3.5 fill-emerald-700 text-emerald-700" />
+                            <span>Best Match</span>
+                          </span>
+                        )}
+                        {!isBestMatch && !isSelected && (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black text-slate-600 bg-slate-100 flex-shrink-0">
+                            {match.matchTitle}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Middle Row: Corridor Flow Container (Soft Blue Box Matching Screenshot) */}
@@ -2183,7 +2255,11 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
                     ? 'bg-[#EA580C]'
                     : 'bg-slate-700'
                 }`}>
-                  {activeReevaluatedMatch.scenario.scenarioTitle}
+                  {activeReevaluatedMatch.matchType === 'DIRECT' 
+                    ? 'Direct Highway Route' 
+                    : activeReevaluatedMatch.matchType === 'CONNECTED' 
+                    ? 'En-Route Boarding Match' 
+                    : 'Verified Corridor Route'}
                 </span>
 
                 <div className="text-right">
@@ -2193,29 +2269,20 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
               </div>
             </div>
 
-            {/* Dynamic Route Matching Scenario Action Card */}
-            <div className={`p-4 rounded-3xl border space-y-2 text-xs shadow-xs ${activeReevaluatedMatch.scenario.badgeStyle.bg} ${activeReevaluatedMatch.scenario.badgeStyle.border}`}>
-              <div className="flex items-center justify-between">
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${activeReevaluatedMatch.scenario.badgeStyle.pillBg} ${activeReevaluatedMatch.scenario.badgeStyle.pillText}`}>
-                  {activeReevaluatedMatch.scenario.scenarioName}
-                </span>
-                {activeReevaluatedMatch.scenario.isHighPriorityZeroDeadhead && (
-                  <span className="text-[10px] font-black bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <Zap className="w-3 h-3" /> Zero Deadhead (High Priority)
-                  </span>
-                )}
-                {activeReevaluatedMatch.scenario.freedUpDownstreamSeats && (
-                  <span className="text-[10px] font-black bg-teal-200 text-teal-900 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Frees Downstream Seat (+1)
-                  </span>
-                )}
+            {/* Route Verification & Seat Allocation Banner */}
+            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200/90 flex items-center justify-between text-xs shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <div>
+                  <span className="font-black text-slate-900 block text-xs">Route Verified on Real Roads</span>
+                  <span className="text-[11px] text-emerald-800">Intermediate stops in correct order • 1 seat reserved</span>
+                </div>
               </div>
-
-              <div className="text-[11px] text-slate-800 leading-snug space-y-1 pt-1">
-                <p><strong className="text-slate-950 font-black">Condition:</strong> {activeReevaluatedMatch.scenario.conditionDescription}</p>
-                <p><strong className="text-slate-950 font-black">Passenger Flow:</strong> {activeReevaluatedMatch.scenario.passengerFlow}</p>
-                <p><strong className="text-slate-950 font-black">System Action:</strong> {activeReevaluatedMatch.scenario.systemAction}</p>
-              </div>
+              <span className="px-2.5 py-1 bg-white border border-emerald-300 text-emerald-800 rounded-full text-[10px] font-black uppercase shadow-2xs">
+                Active Corridor
+              </span>
             </div>
 
             {/* Vertical Milestone Route Timeline with Click-to-Select Drop Stops */}
@@ -2467,8 +2534,8 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
                               {stop.name}
                             </span>
                             {stop.order === activeDriver.corridorStops[activeDriver.corridorStops.length - 1].order ? (
-                              <span className="text-[9px] bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded font-black">
-                                S3: Terminal End
+                              <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-black">
+                                Terminal End
                               </span>
                             ) : destinationLocation.toLowerCase().includes(stop.name.toLowerCase()) || stop.name.toLowerCase().includes(destinationLocation.toLowerCase()) ? (
                               <span className="text-[9px] bg-teal-50 text-teal-700 px-1.5 py-0.2 rounded font-black">
@@ -2584,15 +2651,15 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
 
               <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
                 <div className="flex items-center gap-2 text-slate-600 font-bold">
-                  <Compass className="w-4 h-4 text-slate-500" />
-                  <span>Matching Scenario</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Route Verification</span>
                 </div>
                 <div className="text-right">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${activeReevaluatedMatch.scenario.badgeStyle.pillBg} ${activeReevaluatedMatch.scenario.badgeStyle.pillText}`}>
-                    {activeReevaluatedMatch.scenario.scenarioName}
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Real Roads Verified
                   </span>
-                  <span className="text-[10px] text-slate-500 block font-medium mt-0.5 max-w-[200px] truncate">
-                    {activeReevaluatedMatch.scenario.systemAction}
+                  <span className="text-[10px] text-slate-500 block font-medium mt-0.5">
+                    Stops confirmed along vehicle route
                   </span>
                 </div>
               </div>
@@ -3299,283 +3366,213 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
         </div>
       )}
 
-      {/* =========================================================================
-          MODAL 4: DYNAMIC ROUTE & STOP MATCHING USE CASES ARCHITECTURE GUIDE
-         ========================================================================= */}
-      {showScenarioGuideModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in overflow-y-auto">
-          <div className="bg-white rounded-3xl w-full max-w-lg p-5 space-y-4 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto no-scrollbar">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black">
-                  <Sparkles className="w-4.5 h-4.5 text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="font-black text-sm text-slate-900 leading-tight">Dynamic Route & Stop Matching Engine</h3>
-                  <p className="text-[10px] text-slate-500">System rules & passenger-driver matching workflows</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowScenarioGuideModal(false)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            {/* 5 Scenario Deep-Dive Cards */}
-            <div className="space-y-3">
-              {/* Scenario 1 */}
-              <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-emerald-950 text-xs flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>Scenario 1: Exact Origin Match</span>
-                  </span>
-                  <button
-                    onClick={() => { setShowScenarioGuideModal(false); handleSimulateScenario('S1'); }}
-                    className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black"
-                  >
-                    Test Live
-                  </button>
-                </div>
-                <div className="space-y-1 text-[11px] text-emerald-900">
-                  <p><strong>Condition:</strong> The Driver’s starting point is identical to the Passenger’s pickup location.</p>
-                  <p><strong>Passenger Flow:</strong> The Passenger boards at the very beginning of the Driver's journey.</p>
-                  <p><strong>System Action:</strong> Flag this as a high-priority match since it requires zero deviation or deadhead miles for the Driver to reach the pickup point.</p>
-                </div>
-              </div>
-
-              {/* Scenario 2 */}
-              <div className="p-3.5 bg-blue-50 rounded-2xl border border-blue-200 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-blue-950 text-xs flex items-center gap-1.5">
-                    <Timer className="w-3.5 h-3.5 text-blue-700" />
-                    <span>Scenario 2: En-Route Pickup & Drop-off Match</span>
-                  </span>
-                  <button
-                    onClick={() => { setShowScenarioGuideModal(false); handleSimulateScenario('S2'); }}
-                    className="px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black"
-                  >
-                    Test Live
-                  </button>
-                </div>
-                <div className="space-y-1 text-[11px] text-blue-900">
-                  <p><strong>Condition:</strong> The Driver starts at a different location, but their active route passes directly through both the Passenger’s requested pickup point and destination.</p>
-                  <p><strong>Passenger Flow:</strong> The Passenger boards mid-route and alights mid-route or at the final destination.</p>
-                  <p><strong>System Action:</strong> Calculate the estimated time of arrival (ETA) for the Driver to reach the Passenger’s mid-route pickup point and notify the Passenger to wait.</p>
-                </div>
-              </div>
-
-              {/* Scenario 3 */}
-              <div className="p-3.5 bg-indigo-50 rounded-2xl border border-indigo-200 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-indigo-950 text-xs flex items-center gap-1.5">
-                    <ArrowRight className="w-3.5 h-3.5 text-indigo-700" />
-                    <span>Scenario 3: Exact Destination Match</span>
-                  </span>
-                  <button
-                    onClick={() => { setShowScenarioGuideModal(false); handleSimulateScenario('S3'); }}
-                    className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black"
-                  >
-                    Test Live
-                  </button>
-                </div>
-                <div className="space-y-1 text-[11px] text-indigo-900">
-                  <p><strong>Condition:</strong> Passenger pickup location does not match with rider's destination; Passenger destination matches with rider destination.</p>
-                  <p><strong>Passenger Flow:</strong> The Passenger boards at Origin or an intermediate stop (not at the destination) and rides until the rider's final destination.</p>
-                  <p><strong>System Action:</strong> System pairs the ride easily, confirming passenger pickup location does not match rider destination and passenger destination matches rider destination.</p>
-                </div>
-              </div>
-
-              {/* Scenario 4 */}
-              <div className="p-3.5 bg-teal-50 rounded-2xl border border-teal-200 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-teal-950 text-xs flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-teal-700" />
-                    <span>Scenario 4: Intermediate Stop as Destination</span>
-                  </span>
-                  <button
-                    onClick={() => { setShowScenarioGuideModal(false); handleSimulateScenario('S4'); }}
-                    className="px-2 py-0.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-[10px] font-black"
-                  >
-                    Test Live
-                  </button>
-                </div>
-                <div className="space-y-1 text-[11px] text-teal-900">
-                  <p><strong>Condition:</strong> The Driver’s final destination is further along, but the Passenger’s destination perfectly matches one of the Driver’s pre-added intermediate stops.</p>
-                  <p><strong>Passenger Flow:</strong> The Passenger books the ride, boards at the pickup point, and alights early at their designated intermediate stop while the Driver continues the journey.</p>
-                  <p><strong>System Action:</strong> System confirms the match, sets the Passenger's drop-off pin to the selected intermediate stop, and frees up that seat/capacity for the remainder of the Driver's trip.</p>
-                </div>
-              </div>
-
-              {/* Scenario 5 */}
-              <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-amber-950 text-xs flex items-center gap-1.5">
-                    <Compass className="w-3.5 h-3.5 text-amber-700" />
-                    <span>Scenario 5: Partial Route Ride (Best Alternative Stop)</span>
-                  </span>
-                  <button
-                    onClick={() => { setShowScenarioGuideModal(false); handleSimulateScenario('S5'); }}
-                    className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-black"
-                  >
-                    Test Live
-                  </button>
-                </div>
-                <div className="space-y-1 text-[11px] text-amber-900">
-                  <p><strong>Condition:</strong> The Passenger’s true destination is not strictly on the Driver’s route. However, the Passenger chooses to book a ride to one of the Driver's existing intermediate stops because it gets them closer to their final destination.</p>
-                  <p><strong>Passenger Flow:</strong> The Passenger reviews the Driver's visible stops, selects the one geographically closest to their true destination, and completes the "last mile" independently after drop-off.</p>
-                  <p><strong>System Action:</strong> The system treats the selected intermediate stop as the official drop-off location. Fare and navigation are calculated strictly up to that selected stop, with no route deviation required from the Driver.</p>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowScenarioGuideModal(false)}
-              className="w-full py-3 bg-slate-900 text-white rounded-2xl font-black text-xs transition"
-            >
-              Close Guide & Return to Rides
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* =========================================================================
-          MODAL: EDIT PICKUP & DROP LOCATION
+      {/* =========================================================================
+          MODAL: EDIT STOPS (EXACT MATCH TO IMG_20261014_215259.png)
          ========================================================================= */}
       {showEditLocationsModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in">
-          <div className="bg-white rounded-3xl w-full max-w-lg max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
-            {/* Modal Header */}
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 flex-shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                  <Pencil className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-black text-sm text-white flex items-center gap-2">
-                    <span>Edit Route Locations</span>
-                    <span className="text-[10px] bg-emerald-500 text-slate-950 font-black px-2 py-0.5 rounded-full">
-                      Live Matching
-                    </span>
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Set your boarding & alighting points along the highway corridor
-                  </p>
-                </div>
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden flex flex-col p-4 sm:p-5 space-y-4 animate-in zoom-in-95 duration-150 max-h-[95vh] overflow-y-auto no-scrollbar">
+            
+            {/* 1. Header: Back Arrow, Edit Stops Title, Reset */}
+            <div className="flex items-center justify-between pb-0.5">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playTap();
+                    setShowEditLocationsModal(false);
+                  }}
+                  className="p-1 -ml-1 text-slate-800 hover:text-slate-600 transition cursor-pointer"
+                  title="Go back"
+                >
+                  <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
+                </button>
+                <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                  Edit Stops
+                </h2>
               </div>
               <button
                 type="button"
-                onClick={() => setShowEditLocationsModal(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
+                onClick={handleResetDefaultCorridorStops}
+                className="text-sm font-bold text-blue-600 hover:text-blue-700 transition cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                Reset
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-              
-              {/* Pickup & Drop Inputs Container */}
-              <div className="space-y-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+            {/* 2. Corridor Card (NH 163 Corridor, Live Verified) */}
+            <div className="bg-[#EAF7EE] rounded-2xl p-3.5 flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-[#D2F2DC] flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 fill-[#00875A] text-[#00875A]" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-sm text-slate-900 truncate">NH 163 Corridor</h3>
+                  <p className="text-xs text-slate-500 font-medium">~142 km &nbsp;•&nbsp; ~2h 15m</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-[#D2F2DC] text-[#00875A] rounded-full text-xs font-bold flex-shrink-0">
+                <CheckCircle2 className="w-4 h-4 fill-[#00875A] text-white" />
+                <span>Live Verified</span>
+              </div>
+            </div>
+
+            {/* 3. Stops Track Container with Vertical Dashed Line */}
+            <div className="relative pl-1">
+              {/* Continuous vertical dashed line connecting the stop circles */}
+              <div className="absolute left-[19px] top-7 bottom-7 w-0 border-l-2 border-dashed border-slate-300 pointer-events-none"></div>
+
+              <div className="space-y-3 relative z-10">
                 
-                {/* Pickup Field */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 ring-2 ring-emerald-200"></span>
-                      <span>Pickup Location (Where you board)</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => handleDetectLiveGps()}
-                      className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100/70 hover:bg-emerald-100 transition cursor-pointer"
-                      title="Auto-detect current GPS coordinates"
-                    >
-                      <Crosshair className="w-3 h-3 text-emerald-600" />
-                      <span>Use Live GPS</span>
-                    </button>
+                {/* STOP 1: PICKUP */}
+                <div className="flex items-center gap-3">
+                  {/* Green Number Badge */}
+                  <div className="w-10 h-10 rounded-full bg-[#D1F2DE] flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-[#00875A] text-white font-extrabold text-sm flex items-center justify-center shadow-xs">
+                      1
+                    </div>
                   </div>
 
-                  <div className={`flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl border transition ${
-                    activeEditField === 'PICKUP' ? 'border-emerald-500 ring-2 ring-emerald-100 shadow-xs' : 'border-slate-200'
-                  }`}>
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></span>
-                    <input
-                      type="text"
-                      value={editPickupDraft}
-                      onFocus={() => setActiveEditField('PICKUP')}
-                      onChange={(e) => setEditPickupDraft(e.target.value)}
-                      placeholder="e.g. Warangal, Hanamkonda Bus Terminal, Uppal"
-                      className="w-full text-xs font-bold text-slate-900 bg-transparent outline-none truncate"
-                      autoFocus
-                    />
-                    {editPickupDraft && (
-                      <button
-                        type="button"
-                        onClick={() => setEditPickupDraft('')}
-                        className="text-slate-400 hover:text-slate-600 p-0.5 rounded"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                  {/* Pickup Input Card */}
+                  <div className="flex-1 min-w-0 bg-[#F0FAF4] rounded-2xl p-3 border border-[#D1F2DE]">
+                    <span className="block text-[11px] font-bold text-[#00875A] mb-0.5">
+                      Pickup
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 fill-[#00875A] text-[#00875A] flex-shrink-0" />
+                      <input
+                        type="text"
+                        value={editPickupDraft}
+                        onChange={(e) => setEditPickupDraft(e.target.value)}
+                        placeholder="Enter pickup stop..."
+                        className="w-full text-xs font-bold text-slate-900 bg-transparent outline-none truncate"
+                      />
+                      {editPickupDraft && (
+                        <button
+                          type="button"
+                          onClick={() => setEditPickupDraft('')}
+                          className="text-slate-400 hover:text-slate-600 flex-shrink-0 cursor-pointer p-0.5"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Central Swap Row */}
-                <div className="flex items-center justify-center -my-1">
-                  <button
-                    type="button"
-                    onClick={handleSwapDraftLocations}
-                    className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-full text-[11px] font-black text-slate-700 flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition active:scale-95 cursor-pointer"
-                    title="Swap pickup and drop-off"
-                  >
-                    <ArrowUpDown className="w-3 h-3 text-slate-500" />
-                    <span>Swap Pickup & Drop-off</span>
-                  </button>
-                </div>
+                {/* STOP 2..N: INTERMEDIATE STOPS */}
+                {editIntermediateStopsDraft.map((stop, idx) => {
+                  const stopNumber = idx + 2;
+                  return (
+                    <div key={stop.id} className="flex items-center gap-3">
+                      {/* Blue Number Badge */}
+                      <div className="w-10 h-10 rounded-full bg-[#DCEAF8] flex items-center justify-center flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-[#1D70B8] text-white font-extrabold text-sm flex items-center justify-center shadow-xs">
+                          {stopNumber}
+                        </div>
+                      </div>
 
-                {/* Drop-off Field */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
-                    <span>Drop-off Location (Where you alight)</span>
-                  </label>
+                      {/* Intermediate Input Card */}
+                      <div className="flex-1 min-w-0 bg-[#F7F9FC] rounded-2xl p-3 border border-slate-200/80">
+                        <span className="block text-[11px] font-bold text-slate-500 mb-0.5">
+                          Intermediate
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 fill-[#1D70B8] text-[#1D70B8] flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={stop.name}
+                            onChange={(e) => handleUpdateIntermediateStopName(stop.id, e.target.value)}
+                            placeholder={`Intermediate stop ${stopNumber}...`}
+                            className="w-full text-xs font-bold text-slate-900 bg-transparent outline-none truncate"
+                          />
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveStopUp(idx)}
+                              className="text-slate-400 hover:text-slate-700 p-0.5 cursor-grab active:cursor-grabbing"
+                              title="Reorder stop"
+                            >
+                              <GripVertical className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveIntermediateStop(stop.id)}
+                              className="text-slate-400 hover:text-rose-600 p-0.5 cursor-pointer"
+                              title="Remove stop"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
 
-                  <div className={`flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl border transition ${
-                    activeEditField === 'DROPOFF' ? 'border-rose-500 ring-2 ring-rose-100 shadow-xs' : 'border-slate-200'
-                  }`}>
-                    <MapPin className="w-3.5 h-3.5 text-rose-500 fill-rose-500 flex-shrink-0" />
-                    <input
-                      type="text"
-                      value={editDropoffDraft}
-                      onFocus={() => setActiveEditField('DROPOFF')}
-                      onChange={(e) => setEditDropoffDraft(e.target.value)}
-                      placeholder="e.g. Hyderabad Central, Uppal Metro Hub, Mindspace"
-                      className="w-full text-xs font-bold text-slate-900 bg-transparent outline-none truncate"
-                    />
-                    {editDropoffDraft && (
-                      <button
-                        type="button"
-                        onClick={() => setEditDropoffDraft('')}
-                        className="text-slate-400 hover:text-slate-600 p-0.5 rounded"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                {/* FINAL STOP: DROP-OFF */}
+                <div className="flex items-center gap-3">
+                  {/* Red Number Badge */}
+                  <div className="w-10 h-10 rounded-full bg-[#FEE2E2] flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-[#E53E3E] text-white font-extrabold text-sm flex items-center justify-center shadow-xs">
+                      {editIntermediateStopsDraft.length + 2}
+                    </div>
+                  </div>
+
+                  {/* Drop-off Input Card */}
+                  <div className="flex-1 min-w-0 bg-[#FFF5F5] rounded-2xl p-3 border border-red-100">
+                    <span className="block text-[11px] font-bold text-[#E53E3E] mb-0.5">
+                      Drop-off
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 fill-[#1D70B8] text-[#1D70B8] flex-shrink-0" />
+                      <input
+                        type="text"
+                        value={editDropoffDraft}
+                        onChange={(e) => setEditDropoffDraft(e.target.value)}
+                        placeholder="Enter destination..."
+                        className="w-full text-xs font-bold text-slate-900 bg-transparent outline-none truncate"
+                      />
+                      {editDropoffDraft && (
+                        <button
+                          type="button"
+                          onClick={() => setEditDropoffDraft('')}
+                          className="text-slate-400 hover:text-slate-600 flex-shrink-0 cursor-pointer p-0.5"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
               </div>
             </div>
 
-            {/* Modal Footer Actions */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 flex-shrink-0">
+            {/* 4. Add Stop Dashed Button */}
+            <button
+              type="button"
+              onClick={() => handleAddIntermediateStop()}
+              className="w-full py-3.5 px-4 rounded-2xl border-2 border-dashed border-[#00875A] bg-[#F0FAF4] hover:bg-[#E5F7EC] text-[#00875A] font-extrabold text-sm flex items-center justify-center gap-2 transition cursor-pointer active:scale-98 shadow-2xs"
+            >
+              <div className="w-6 h-6 rounded-full bg-[#00875A] text-white flex items-center justify-center shadow-xs">
+                <Plus className="w-4 h-4 stroke-[3]" />
+              </div>
+              <span>Add Stop</span>
+            </button>
+
+            {/* 5. Cancel and Save Buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
               <button
                 type="button"
-                onClick={() => setShowEditLocationsModal(false)}
-                className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 font-bold text-xs transition cursor-pointer"
+                onClick={() => {
+                  sounds.playTap();
+                  setShowEditLocationsModal(false);
+                }}
+                className="w-full py-3.5 px-4 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-900 font-extrabold text-sm transition cursor-pointer shadow-xs active:scale-95 text-center"
               >
                 Cancel
               </button>
@@ -3583,12 +3580,13 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
               <button
                 type="button"
                 onClick={() => handleApplyEditedLocations()}
-                className="flex-1 py-2.5 px-4 bg-[#00875A] hover:bg-[#007048] text-white font-black text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-emerald-700/25 active:scale-95 transition cursor-pointer"
+                className="w-full py-3.5 px-4 rounded-2xl bg-[#00875A] hover:bg-[#007048] text-white font-extrabold text-sm flex items-center justify-center gap-2 transition cursor-pointer shadow-md shadow-emerald-800/25 active:scale-95 text-center"
               >
-                <Check className="w-4 h-4 stroke-[2.5]" />
-                <span>Apply & Search Rides</span>
+                <CheckCircle2 className="w-5 h-5 text-white" />
+                <span>Save</span>
               </button>
             </div>
+
           </div>
         </div>
       )}
@@ -3609,11 +3607,11 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
                   <h3 className="font-black text-sm text-white flex items-center gap-2">
                     <span>Route Matching & Backend Validation Test Suite</span>
                     <span className="text-[10px] bg-emerald-500 text-slate-950 font-black px-2 py-0.5 rounded-full">
-                      All 5 Scenarios
+                      All Scenarios
                     </span>
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Comprehensive assertions for S1, S2, S3, S4, S5 + Error Handling Rules
+                    Comprehensive assertions for S1, S2, S4, S5 + Error Handling Rules
                   </p>
                 </div>
               </div>
@@ -3704,7 +3702,6 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
                                 <span className={`text-[9px] font-black px-2 py-0.2 rounded-full ${
                                   test.scenarioCode === 'S1' ? 'bg-emerald-100 text-emerald-800' :
                                   test.scenarioCode === 'S2' ? 'bg-blue-100 text-blue-800' :
-                                  test.scenarioCode === 'S3' ? 'bg-indigo-100 text-indigo-800' :
                                   test.scenarioCode === 'S4' ? 'bg-teal-100 text-teal-800' :
                                   test.scenarioCode === 'S5' ? 'bg-amber-100 text-amber-800' :
                                   'bg-rose-100 text-rose-800'

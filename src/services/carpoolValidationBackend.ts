@@ -6,7 +6,6 @@
  * 
  * - Scenario 1: Exact Origin Match (Zero Deadhead)
  * - Scenario 2: En-Route Pickup & Drop-off Match (Mid-Route Pickup & Drop)
- * - Scenario 3: Destination Matches Rider Destination (Pickup != Rider Dest, Passenger Dest == Rider Dest)
  * - Scenario 4: Intermediate Stop as Destination (Early Alight, Downstream Seat Freed)
  * - Scenario 5: Partial Route Ride (Best Alternative Stop, 0 km Driver Deviation, Last Mile)
  * - Error Handling: Sequence inversion, pickup matching destination, zero capacity, out-of-corridor.
@@ -220,7 +219,7 @@ export function validateRouteMatchRequest(
     auditTrail.push(`[CHECK PASSED] Passenger pickup is distinct from rider destination: ${pickupAddr} != ${driverTo}`);
   }
 
-  // CHECK 2: Passenger destination matches rider destination (For Scenario 3 & general pairing)
+  // CHECK 2: Passenger destination matches rider destination (For corridor pairing)
   const isDestMatchingRiderDest = Boolean(
     destAddr && (
       destAddr === driverTo ||
@@ -540,72 +539,7 @@ export function runAllScenarioTests(): TestSuiteSummary {
   });
 
   // -------------------------------------------------------------------------
-  // TEST 3: Scenario 3: Destination Matches Rider Destination
-  // -------------------------------------------------------------------------
-  const startT3 = performance.now();
-  const req3: RouteMatchValidationRequest = {
-    driver,
-    passengerPickup: {
-      address: 'Uppal Metro Hub',
-      location: { x: 260, y: 270 }
-    },
-    passengerDropoff: {
-      address: 'Hyderabad Central',
-      location: { x: 120, y: 250 }
-    },
-    requestedSeats: 1
-  };
-  const res3 = validateRouteMatchRequest(req3);
-  const dur3 = performance.now() - startT3;
-
-  testResults.push({
-    scenarioCode: 'S3',
-    scenarioName: 'Scenario 3: Exact Destination Match',
-    description: "Passenger pickup location does not match rider's destination; Passenger destination matches with rider destination (Uppal -> Hyderabad Central).",
-    passed: (
-      res3.isValid &&
-      res3.scenarioCode === 'S3' &&
-      res3.verificationChecklist.pickupNotAtRiderDestination === true &&
-      res3.verificationChecklist.destinationMatchesRiderDestination === true
-    ),
-    durationMs: +dur3.toFixed(2),
-    assertions: [
-      {
-        label: 'Scenario Code equals S3',
-        expected: 'S3',
-        actual: res3.scenarioCode,
-        passed: res3.scenarioCode === 'S3'
-      },
-      {
-        label: 'Passenger pickup does NOT match rider destination',
-        expected: true,
-        actual: res3.verificationChecklist.pickupNotAtRiderDestination,
-        passed: res3.verificationChecklist.pickupNotAtRiderDestination === true
-      },
-      {
-        label: 'Passenger destination matches rider destination',
-        expected: true,
-        actual: res3.verificationChecklist.destinationMatchesRiderDestination,
-        passed: res3.verificationChecklist.destinationMatchesRiderDestination === true
-      },
-      {
-        label: 'Drop-off stop is Driver Terminal Stop',
-        expected: 'Hyderabad Central',
-        actual: res3.matchAnalysis.dropoffStop.name,
-        passed: res3.matchAnalysis.dropoffStop.name === 'Hyderabad Central'
-      },
-      {
-        label: 'Validation checklist all valid',
-        expected: true,
-        actual: res3.isValid,
-        passed: res3.isValid
-      }
-    ],
-    validationResult: res3
-  });
-
-  // -------------------------------------------------------------------------
-  // TEST 4: Scenario 4: Intermediate Stop as Destination
+  // TEST 3: Scenario 4: Intermediate Stop as Destination
   // -------------------------------------------------------------------------
   const startT4 = performance.now();
   const req4: RouteMatchValidationRequest = {

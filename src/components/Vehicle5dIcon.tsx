@@ -706,8 +706,16 @@ export const LiveMap5dVehicleMarker: React.FC<LiveMap5dVehicleMarkerProps> = ({
           style={{ backgroundColor: theme.glowColor }}
         />
 
-        {/* Low-Poly or Vector Vehicle Cutout */}
-        {renderVectorVehicleSvg(type, false, "scale-110")}
+        {/* Low-Poly or Vector Vehicle Cutout - Forward oriented so headlights lead forward */}
+        <div className="w-full h-full flex items-center justify-center scale-110">
+          <div className={
+            (type || '').toUpperCase().includes('BIKE') || (type || '').toUpperCase().includes('AUTO')
+              ? '-rotate-90 w-full h-full flex items-center justify-center'
+              : 'rotate-90 w-full h-full flex items-center justify-center'
+          }>
+            {renderVectorVehicleSvg(type, false, "w-full h-full")}
+          </div>
+        </div>
       </div>
 
       {/* Dynamic contact shadow under wheels */}

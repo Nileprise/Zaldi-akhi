@@ -1,6 +1,6 @@
 /**
  * Automated CLI Test Suite for Carpool Route-Matching Scenarios
- * Tests all 5 scenarios + error handling cases.
+ * Tests S1, S2, S4, S5 scenarios + error handling cases.
  * 
  * Run with: npx tsx test/scenarios.test.ts
  */
@@ -9,7 +9,7 @@ import { runAllScenarioTests } from '../src/services/carpoolValidationBackend';
 
 console.log('======================================================================');
 console.log('   ZALDI CARPOOL ROUTE-MATCHING & VALIDATION TEST SUITE');
-console.log('   Scenarios: S1, S2, S3, S4, S5 + Error Handling');
+console.log('   Scenarios: S1, S2, S4, S5 + Error Handling');
 console.log('======================================================================\n');
 
 const testSuite = runAllScenarioTests();

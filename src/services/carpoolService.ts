@@ -430,21 +430,6 @@ export const ROUTE_MATCHING_SCENARIOS_META: Record<MatchingScenarioCode, {
       pillText: 'text-white'
     }
   },
-  S3: {
-    name: 'Scenario 3: Exact Destination Match',
-    title: 'Destination Matches Rider Destination',
-    shortTag: 'Destination Match',
-    condition: "Passenger pickup location does not match with rider's destination; Passenger destination matches with rider destination.",
-    passengerFlow: "The Passenger boards at an Origin or intermediate stop (not at the destination) and rides to the rider's destination.",
-    systemAction: "System pairs the ride, verifying passenger pickup location does not match rider destination and passenger destination matches rider destination.",
-    badgeStyle: {
-      bg: 'bg-indigo-50',
-      text: 'text-indigo-900',
-      border: 'border-indigo-300',
-      pillBg: 'bg-indigo-600',
-      pillText: 'text-white'
-    }
-  },
   S4: {
     name: 'Scenario 4: Intermediate Stop as Destination',
     title: 'Intermediate Stop as Destination',
@@ -582,7 +567,7 @@ export const VERIFIED_TRANSFER_HUBS: Record<string, VerifiedTransferConnection[]
   ]
 };
 
-export type MatchingScenarioCode = 'S1' | 'S2' | 'S3' | 'S4' | 'S5' | 'NONE';
+export type MatchingScenarioCode = 'S1' | 'S2' | 'S4' | 'S5' | 'NONE';
 
 export interface MatchingScenarioDetails {
   scenarioCode: MatchingScenarioCode;
@@ -911,14 +896,6 @@ export function matchDriverRouteToPassenger(
   const isEnRoutePickup = bestPickupStop.order > 0 && pickupDistanceKm <= 1.5;
   const midRoutePickupEtaMin = Math.round(15 + bestPickupStop.order * 15);
 
-  // Scenario 3: Exact Destination Match
-  // Passenger's final destination is exactly the same as Driver's final destination
-  const isTerminalDestinationMatch = Boolean(
-    passengerDestPos &&
-    (bestDropoffStop.order === terminalStop.order || bestDropoffStop.id === terminalStop.id) &&
-    (dropoffDistanceKm <= 1.5 || isDirectStopNameMatch || (destText && driverToText.includes(destText)))
-  );
-
   // Scenario 4: Intermediate Stop as Destination
   // Driver's final destination is further along, but passenger destination matches an intermediate stop
   const isIntermediateStopAsDest = Boolean(
@@ -934,13 +911,12 @@ export function matchDriverRouteToPassenger(
 
   // Scenario 5: Partial Route Ride (Best Alternative Stop)
   // Passenger destination is off-route. Passenger selects the closest intermediate stop
-  const isPartialAlternativeStop = matchType === 'PARTIAL' || (!isTerminalDestinationMatch && !isIntermediateStopAsDest && Boolean(passengerDestPos));
+  const isPartialAlternativeStop = matchType === 'PARTIAL' || (!isIntermediateStopAsDest && bestDropoffStop.order !== terminalStop.order && Boolean(passengerDestPos));
 
   const applicableScenarios: MatchingScenarioCode[] = [];
   if (matchType !== 'NO_MATCH') {
     if (isExactOriginMatch) applicableScenarios.push('S1');
     if (isEnRoutePickup) applicableScenarios.push('S2');
-    if (isTerminalDestinationMatch) applicableScenarios.push('S3');
     if (isIntermediateStopAsDest) applicableScenarios.push('S4');
     if (isPartialAlternativeStop) applicableScenarios.push('S5');
   } else {
@@ -983,7 +959,7 @@ export function matchDriverRouteToPassenger(
         pillText: 'text-white'
       }
     };
-  } else if (isExactOriginMatch && isTerminalDestinationMatch) {
+  } else if (isExactOriginMatch && bestDropoffStop.order === terminalStop.order) {
     scenario = {
       scenarioCode: 'S1',
       scenarioName: 'Scenario 1: Exact Origin Match',
@@ -1016,18 +992,6 @@ export function matchDriverRouteToPassenger(
         pillBg: 'bg-emerald-600',
         pillText: 'text-white'
       }
-    };
-  } else if (isTerminalDestinationMatch) {
-    scenario = {
-      scenarioCode: 'S3',
-      scenarioName: 'Scenario 3: Exact Destination Match',
-      scenarioTitle: 'Destination Matches Rider Destination',
-      conditionDescription: `Passenger pickup location does not match with rider's destination (${terminalStop.name}); Passenger destination matches with rider destination (${terminalStop.name}).`,
-      passengerFlow: `Board at ${bestPickupStop.name} (not at rider destination) and ride until rider destination (${terminalStop.name}).`,
-      systemAction: `System pairs ride to destination. Confirmed passenger pickup location does not match rider destination, and passenger destination matches rider destination. Fare: ₹${calculatedFare}.`,
-      pickupDoesNotMatchRiderDestination: !isPickupMatchingRiderDestination,
-      destinationMatchesRiderDestination: true,
-      badgeStyle: ROUTE_MATCHING_SCENARIOS_META.S3.badgeStyle
     };
   } else if (isEnRoutePickup && matchType === 'DIRECT') {
     scenario = {
@@ -1090,7 +1054,7 @@ export function matchDriverRouteToPassenger(
     legalStopBadgeText,
     unmatchedReason,
     pickupDoesNotMatchRiderDestination: !isPickupMatchingRiderDestination,
-    destinationMatchesRiderDestination: isTerminalDestinationMatch
+    destinationMatchesRiderDestination: Boolean(bestDropoffStop.order === terminalStop.order || (destText && driverToText.includes(destText)))
   };
 }
 
@@ -1140,8 +1104,8 @@ export function recalculateMatchForSelectedStop(
   const isTerminalExactMatch = trueDestLower && (terminalStop.name.toLowerCase().includes(trueDestLower) || driver.to.toLowerCase().includes(trueDestLower));
 
   if (isOriginBoarding && isTerminalSelected && (!trueDestLower || isTerminalExactMatch)) {
-    // S1 & S3
-    applicableScenarios.push('S1', 'S3');
+    // S1: Exact Origin Match
+    applicableScenarios.push('S1');
     scenario = {
       scenarioCode: 'S1',
       scenarioName: 'Scenario 1: Exact Origin Match',
@@ -1169,18 +1133,18 @@ export function recalculateMatchForSelectedStop(
     };
     matchType = 'DIRECT';
   } else if (isTerminalSelected) {
-    // Scenario 3: Exact Destination Match
-    applicableScenarios.push('S3');
+    // Terminal Destination Selected - En-Route Pickup & Drop-off Match (S2)
+    applicableScenarios.push('S2');
+    const midEta = Math.round(15 + pickupStop.order * 15);
     scenario = {
-      scenarioCode: 'S3',
-      scenarioName: 'Scenario 3: Exact Destination Match',
-      scenarioTitle: 'Destination Matches Rider Destination',
-      conditionDescription: `Passenger pickup location does not match with rider's destination (${terminalStop.name}); Passenger destination matches with rider destination (${terminalStop.name}).`,
-      passengerFlow: `Board at ${pickupStop.name} (does not match rider destination) and ride until rider destination (${terminalStop.name}).`,
-      systemAction: `System pairs ride easily: Passenger pickup location does not match rider destination, and passenger destination matches rider destination. Fare: ₹${recalculatedFare}.`,
-      pickupDoesNotMatchRiderDestination: pickupStop.id !== terminalStop.id,
-      destinationMatchesRiderDestination: true,
-      badgeStyle: ROUTE_MATCHING_SCENARIOS_META.S3.badgeStyle
+      scenarioCode: 'S2',
+      scenarioName: 'Scenario 2: En-Route Pickup & Drop-off Match',
+      scenarioTitle: 'En-Route Pickup & Drop-off Match',
+      conditionDescription: `Driver starts at ${originStop.name}, but active route passes directly through your pickup (${pickupStop.name}) and continues to destination (${terminalStop.name}).`,
+      passengerFlow: `Board mid-route at ${pickupStop.name} and alight at driver destination (${terminalStop.name}).`,
+      systemAction: `Calculate ETA (${midEta} min) for Driver to reach mid-route pickup point and notify Passenger to wait. Fare: ₹${recalculatedFare}.`,
+      midRoutePickupEtaMin: midEta,
+      badgeStyle: ROUTE_MATCHING_SCENARIOS_META.S2.badgeStyle
     };
     matchType = 'DIRECT';
   } else if (!isOriginBoarding && !isTerminalSelected && trueDestLower && selectedStopLower.includes(trueDestLower)) {

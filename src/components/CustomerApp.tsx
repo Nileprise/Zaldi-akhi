@@ -54,6 +54,28 @@ const VEHICLE_PARCEL_SPECS: Record<string, { maxWeight: number; types: { label: 
       { label: 'Bulk Freight (up to 100kg)', icon: '📦', desc: 'Heavy boxes & medium freight' }
     ]
   },
+  CAB: {
+    maxWeight: 250,
+    types: [
+      { label: 'Luggage & Travel Bags', icon: '🧳', desc: 'Airport luggage, suitcases & gear' },
+      { label: 'Electronics & Fragile Items', icon: '💻', desc: 'Monitors, PCs & sensitive equipment' },
+      { label: 'Catering & Bulk Food Orders', icon: '🎂', desc: 'Party catering & bulk perishables' },
+      { label: 'Retail Stock & Boutique Boxes', icon: '🛍️', desc: 'Apparel cartons & store goods' },
+      { label: 'Urgent Secured Documents', icon: '📁', desc: 'Confidential files & legal packages' },
+      { label: 'Car Boot Cargo (up to 250kg)', icon: '📦', desc: 'Sedan boot delivery' }
+    ]
+  },
+  PREMIUM: {
+    maxWeight: 450,
+    types: [
+      { label: 'Heavy Luggage & Family Travel', icon: '🧳', desc: 'Multiple large suitcases & sports gear' },
+      { label: 'Event & Exhibition Equipment', icon: '🎪', desc: 'Banners, standees & audio setups' },
+      { label: 'Bulk Wholesale Packages', icon: '📦', desc: 'Commercial boxes & distribution' },
+      { label: 'Home Appliances & Decor', icon: '🛋️', desc: 'Small furniture, TVs & decor sets' },
+      { label: 'Industrial Kits & Hardware', icon: '⚙️', desc: 'Specialized tools & components' },
+      { label: 'Zaldi XL SUV Load (up to 450kg)', icon: '🚙', desc: 'Full SUV boot & rear cargo space' }
+    ]
+  },
   TRUCK: {
     maxWeight: 750,
     types: [
@@ -137,6 +159,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const [parcelTypes, setParcelTypes] = useState<Record<string, string>>({
     BIKE: 'Documents & Envelopes',
     AUTO: 'Cartons & Medium Boxes',
+    CAB: 'Luggage & Travel Bags',
+    PREMIUM: 'Heavy Luggage & Family Travel',
     TRUCK: 'Commercial Cargo & Freight'
   });
   const [isParcelDropdownOpen, setIsParcelDropdownOpen] = useState(false);
@@ -145,6 +169,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const [parcelWeights, setParcelWeights] = useState<Record<string, number>>({
     BIKE: 5,
     AUTO: 25,
+    CAB: 35,
+    PREMIUM: 70,
     TRUCK: 200
   });
 
@@ -249,7 +275,6 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   // Active Service Mode for the selected vehicle ('PERSON' or 'PARCEL')
   const currentMode: ServiceMode = useMemo(() => {
     if (selectedVehicleId === 'TRUCK') return 'PARCEL';
-    if (selectedVehicleId === 'CAB' || selectedVehicleId === 'PREMIUM') return 'PERSON';
     return serviceModes[selectedVehicleId] || 'PERSON';
   }, [selectedVehicleId, serviceModes]);
 
@@ -283,7 +308,6 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const [routingEngine, setRoutingEngine] = useState<RoutingEngineType>('GOOGLE_MAPS_ROUTES_API');
   const [liveRoadRoute, setLiveRoadRoute] = useState<RoadRouteInfo | null>(null);
   const [isLoadingRoadRoute, setIsLoadingRoadRoute] = useState(false);
-  const [showRoadManeuvers, setShowRoadManeuvers] = useState(false);
 
   // Fallback geometric road route
   const fallbackRoadRoute = useMemo(() => {
@@ -709,7 +733,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
           {/* Pull Handle */}
           <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-2.5 mb-1.5 flex-shrink-0 cursor-pointer"></div>
 
-          <div ref={drawerScrollRef} className={`flex-1 min-h-0 overflow-y-auto px-5 no-scrollbar relative text-slate-900 ${(selectedVehicleId === 'CAB' || selectedVehicleId === 'PREMIUM' || ((selectedVehicleId === 'BIKE' || selectedVehicleId === 'AUTO') && currentMode === 'PERSON') || customerTab === 'CARPOOL') ? 'pb-2' : 'pb-6'}`}>
+          <div ref={drawerScrollRef} className={`flex-1 min-h-0 overflow-y-auto px-5 no-scrollbar relative text-slate-900 ${(currentMode === 'PERSON' || customerTab === 'CARPOOL') ? 'pb-2' : 'pb-6'}`}>
             
             {/* =========================================
                 1. BOOKING TAB
@@ -967,30 +991,28 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                     </div>
 
                     {/* ====================================================
-                        SERVICE MODE CONTROLS (RIDE vs TRANSPORT FOR VEHICLES)
-                        (Completely removed for Cab Prime & Zaldi XL)
+                        SERVICE MODE CONTROLS (RIDE vs TRANSPORT FOR ALL VEHICLES)
                        ==================================================== */}
-                    {selectedVehicleId !== 'CAB' && selectedVehicleId !== 'PREMIUM' && (
-                      <div className="space-y-3 p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs animate-in fade-in">
-                        
-                        {/* Services Header & Ride (Person) vs Transport (Parcel) Segmented Controls */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-xs font-black text-slate-900 flex items-center gap-1">
-                              <Sparkles className="w-3.5 h-3.5 text-brand-blue" />
-                              <span>Services:</span>
-                            </span>
-                          </div>
+                    <div className="space-y-3 p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs animate-in fade-in">
+                      
+                      {/* Services Header & Ride (Person) vs Transport (Parcel) Segmented Controls */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs font-black text-slate-900 flex items-center gap-1">
+                            <Sparkles className="w-3.5 h-3.5 text-brand-blue" />
+                            <span>Services:</span>
+                          </span>
+                        </div>
 
-                          {selectedVehicleId === 'TRUCK' ? (
-                            // For Mini Truck: strictly dedicated to Commercial Cargo / Freight
-                            <div className="bg-white px-3 py-1.5 rounded-xl border border-amber-300/80 shadow-xs flex items-center gap-1.5 text-xs font-black text-amber-700 dark:text-amber-300">
-                              <Package className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Cargo Freight & Transport (Max 750 kg)</span>
-                            </div>
-                          ) : (
-                            // For Bike Moto and Auto 3W: Both Ride and Transport services available
-                            <div className="bg-white p-0.5 rounded-xl flex items-center gap-1 border border-slate-200 flex-shrink-0 shadow-xs">
+                        {selectedVehicleId === 'TRUCK' ? (
+                          // For Mini Truck: strictly dedicated to Commercial Cargo / Freight
+                          <div className="bg-white px-3 py-1.5 rounded-xl border border-amber-300/80 shadow-xs flex items-center gap-1.5 text-xs font-black text-amber-700 dark:text-amber-300">
+                            <Package className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Cargo Freight & Transport (Max 750 kg)</span>
+                          </div>
+                        ) : (
+                          // For Bike, Auto, Cab Prime (Car) & Zaldi XL: Both Ride and Transport services available
+                          <div className="bg-white p-0.5 rounded-xl flex items-center gap-1 border border-slate-200 flex-shrink-0 shadow-xs">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1266,264 +1288,104 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                         </div>
                       )}
 
-                      {/* Person mode has no baggage policy or luggage fee */}
-                    </div>
-                  )}
-
-                  {/* ====================================================
-                      CAB CONNECTED ROUTE & AT-ANY-POINT DROP PANEL
-                      When Cab Prime Sedan or Zaldi XL is selected
-                     ==================================================== */}
-                  {(selectedVehicleId === 'CAB' || selectedVehicleId === 'PREMIUM') && (
-                    <div className="space-y-3 p-3.5 bg-gradient-to-br from-white via-slate-50 to-blue-50/40 rounded-2xl border border-blue-200/80 shadow-xs animate-in fade-in">
-                      {/* Real Road Routing Engine Switcher & Status */}
-                      <div className="p-2.5 rounded-xl bg-slate-900 text-white space-y-2 border border-slate-700/80 shadow-md">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-200">
-                              Real Road Routing Engine
-                            </span>
-                          </div>
-                          {isLoadingRoadRoute && (
-                            <span className="text-[9px] text-sky-400 font-bold animate-pulse">
-                              Calculating road route...
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Engine Switcher Buttons */}
-                        <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-slate-800 rounded-lg">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              sounds.playTap();
-                              setRoutingEngine('GOOGLE_MAPS_ROUTES_API');
-                            }}
-                            className={`py-1 px-2 rounded-md text-[10px] font-black transition flex items-center justify-center gap-1 ${
-                              routingEngine === 'GOOGLE_MAPS_ROUTES_API'
-                                ? 'bg-blue-600 text-white shadow-xs'
-                                : 'text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            <span>Google Maps Routes</span>
-                            {routingEngine === 'GOOGLE_MAPS_ROUTES_API' && <Check className="w-2.5 h-2.5" />}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              sounds.playTap();
-                              setRoutingEngine('OSRM');
-                            }}
-                            className={`py-1 px-2 rounded-md text-[10px] font-black transition flex items-center justify-center gap-1 ${
-                              routingEngine === 'OSRM'
-                                ? 'bg-blue-600 text-white shadow-xs'
-                                : 'text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            <span>OSRM Engine</span>
-                            {routingEngine === 'OSRM' && <Check className="w-2.5 h-2.5" />}
-                          </button>
-                        </div>
-
-                        {/* Real Road Distance & Time Banner */}
-                        <div className="flex items-center justify-between text-[11px] pt-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-emerald-400 font-black">
-                              {effectiveRoadRouteInfo?.totalDistanceKm || distanceKm || 8.4} km
-                            </span>
-                            <span className="text-slate-400">·</span>
-                            <span className="text-white font-bold">
-                              ~{effectiveRoadRouteInfo?.estimatedTravelTimeMin || 18} mins driving
-                            </span>
-                          </div>
-
-                          {effectiveRoadRouteInfo?.steps && effectiveRoadRouteInfo.steps.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                sounds.playTap();
-                                setShowRoadManeuvers(!showRoadManeuvers);
-                              }}
-                              className="text-[10px] font-bold text-sky-400 hover:text-sky-300 underline flex items-center gap-0.5"
-                            >
-                              <span>{showRoadManeuvers ? 'Hide Steps' : `Steps (${effectiveRoadRouteInfo.steps.length})`}</span>
-                              {showRoadManeuvers ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Turn-by-Turn Steps Drawer */}
-                        {showRoadManeuvers && effectiveRoadRouteInfo?.steps && (
-                          <div className="mt-2 pt-2 border-t border-slate-700/80 max-h-36 overflow-y-auto no-scrollbar space-y-1.5 text-[10px]">
-                            {effectiveRoadRouteInfo.steps.slice(0, 6).map((step: { instruction: string; distanceMeters: number }, idx: number) => (
-                              <div key={idx} className="flex items-start gap-1.5 text-slate-300">
-                                <span className="w-3.5 h-3.5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[8px] font-bold text-slate-400 flex-shrink-0 mt-0.5">
-                                  {idx + 1}
+                      {/* Person (Ride) Mode Options for Bike & Auto (Deleted for Car & Zaldi XL per request) */}
+                      {currentMode === 'PERSON' && selectedVehicleId !== 'CAB' && selectedVehicleId !== 'PREMIUM' && (
+                        <div className="space-y-3 pt-1 border-t border-slate-200/80">
+                          <div className="p-3 bg-slate-50/90 rounded-2xl border border-slate-200 space-y-2.5">
+                            {/* Vehicle Tier Ride Details Header */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-base shadow-2xs flex-shrink-0">
+                                  {selectedVehicle.icon}
                                 </span>
-                                <div className="flex-1">
-                                  <p className="font-medium text-white">{step.instruction}</p>
-                                  <span className="text-[9px] text-slate-400">
-                                    {step.distanceMeters > 1000 ? `${(step.distanceMeters / 1000).toFixed(1)} km` : `${step.distanceMeters} m`}
+                                <div className="min-w-0">
+                                  <span className="text-xs font-black text-slate-900 block leading-tight truncate">
+                                    {selectedVehicle.name} • Ride Options
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 block truncate">
+                                    {selectedVehicleId === 'BIKE' && 'Solo rider • Helmet provided • Fast transit'}
+                                    {selectedVehicleId === 'AUTO' && 'Up to 3 passengers • Direct city route'}
+                                    {selectedVehicleId === 'TRUCK' && 'Up to 2 passengers with cargo'}
                                   </span>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Header */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-black shadow-2xs">
-                            🚕
-                          </span>
-                          <div>
-                            <span className="text-xs font-black text-slate-900 block leading-tight">
-                              Cab Connected Corridor & Flexible Drop
-                            </span>
-                            <span className="text-[10px] text-slate-500">
-                              Passenger pickup & destination connected • Drop at any connected stop
-                            </span>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            sounds.playSuccess();
-                            setCustomerTab('CARPOOL');
-                          }}
-                          className="px-2.5 py-1 rounded-xl bg-[#00875A] hover:bg-emerald-700 text-white text-[10px] font-black transition flex items-center gap-1 shadow-2xs"
-                        >
-                          <span>Open Hub</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </button>
-                      </div>
-
-                      {/* Route Match Verification Status Banner */}
-                      <div className="p-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/90 rounded-xl space-y-1 shadow-2xs">
-                        <div className="flex items-center gap-1.5 text-blue-900 font-black text-[11px]">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-700 flex-shrink-0" />
-                          <span>Route Match Verification</span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[10px] text-slate-700 font-medium">
-                          <div className="flex items-center gap-1 text-emerald-800 bg-white/80 px-2 py-1 rounded-lg border border-emerald-200">
-                            <Check className="w-3 h-3 text-emerald-600 flex-shrink-0 stroke-[2.5]" />
-                            <span className="font-bold">Pickup does not match rider destination</span>
-                          </div>
-                          <div className="flex items-center gap-1 text-indigo-800 bg-white/80 px-2 py-1 rounded-lg border border-indigo-200">
-                            <Check className="w-3 h-3 text-indigo-600 flex-shrink-0 stroke-[2.5]" />
-                            <span className="font-bold">Passenger dest matches rider destination</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Connected Points Grid */}
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {/* 1. Passenger Pickup Point Connected */}
-                        <div className="p-2.5 rounded-xl bg-white border border-blue-200 shadow-2xs space-y-0.5">
-                          <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-blue-700">
-                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-                            <span>Pickup Point Connected</span>
-                          </div>
-                          <span className="font-black text-slate-900 text-xs block truncate" title={pickup || fixedPinAddress || DEFAULT_GPS_ADDRESS}>
-                            {pickup || fixedPinAddress || DEFAULT_GPS_ADDRESS}
-                          </span>
-                          <span className="text-[9px] text-emerald-700 font-bold block truncate">
-                            ✓ Does not match rider destination
-                          </span>
-                        </div>
-
-                        {/* 2. Destination Connected */}
-                        <div className="p-2.5 rounded-xl bg-white border border-rose-200 shadow-2xs space-y-0.5">
-                          <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-rose-700">
-                            <span className="w-2 h-2 rounded-full bg-rose-600"></span>
-                            <span>Destination Connected</span>
-                          </div>
-                          <span className="font-black text-slate-900 text-xs block truncate" title={drop || 'Hyderabad Central Corridor'}>
-                            {drop || 'Hyderabad Central Corridor'}
-                          </span>
-                          <span className="text-[9px] text-indigo-700 font-bold block truncate">
-                            ✓ Matches rider destination
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* 3. At Any Connected Point Drop Selector */}
-                      <div className="pt-2 border-t border-slate-200/80 space-y-2">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-black text-slate-800 flex items-center gap-1">
-                            <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>At Any Connected Point Drop:</span>
-                          </span>
-                          <span className="text-[9px] font-bold text-slate-500">
-                            Tap any stop to drop there
-                          </span>
-                        </div>
-
-                        {/* Smart Corridor Connected Stops (Urban or Highway Corridor) */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                          {((pickup + drop).toLowerCase().includes('warangal') || (pickup + drop).toLowerCase().includes('kazipet') || (pickup + drop).toLowerCase().includes('jangaon')
-                            ? [
-                                { name: 'Kazipet Link Hub', km: 8.5, eta: '+15m' },
-                                { name: 'Jangaon Bypass (NH 163)', km: 45.0, eta: '+45m' },
-                                { name: 'Aler Tollway Junction', km: 75.0, eta: '+1h 10m' },
-                                { name: 'Bhongir Highway Hub', km: 95.0, eta: '+1h 30m' },
-                                { name: 'Ghatkesar ORR Corridor', km: 115.0, eta: '+1h 50m' },
-                                { name: 'Uppal Metro Hub', km: 130.0, eta: '+2h 05m' },
-                                { name: 'Hyderabad Central Corridor', km: 145.0, eta: '+2h 25m' },
-                                { name: 'Mindspace Hitec IT Park', km: 160.0, eta: '+2h 45m' }
-                              ]
-                            : [
-                                { name: 'Mindspace IT Park Circular Rd', km: 1.8, eta: '+4m' },
-                                { name: 'Hitec City Metro Station', km: 3.4, eta: '+8m' },
-                                { name: 'Inorbit Mall Boulevard', km: 5.2, eta: '+12m' },
-                                { name: 'Cable Bridge Expressway', km: 7.4, eta: '+16m' },
-                                { name: 'Road No. 36 Jubilee Hills', km: 9.8, eta: '+21m' },
-                                { name: 'Road No. 1 Banjara Hills', km: 12.4, eta: '+26m' },
-                                { name: 'Punjagutta Elevated Corridor', km: 14.8, eta: '+31m' },
-                                { name: 'Secunderabad Railway Station', km: 18.5, eta: '+38m' },
-                                { name: 'RGIA Airport Terminal Ramp', km: 29.0, eta: '+45m' }
-                              ]
-                          ).map((stop) => {
-                            const isSelectedDrop = drop?.toLowerCase().includes(stop.name.toLowerCase().split(' ')[0]);
-                            const stopEstFare = Math.max(49, 25 + Math.round(stop.km * 8 * 1.05));
-
-                            return (
-                              <button
-                                key={stop.name}
-                                type="button"
-                                onClick={() => {
-                                  sounds.playSuccess();
-                                  setDrop(stop.name);
-                                  recalcDistance(pickup || fixedPinAddress || DEFAULT_GPS_ADDRESS, stop.name);
-                                }}
-                                className={`flex-shrink-0 px-2.5 py-1.5 rounded-xl text-left border transition flex flex-col min-w-[115px] cursor-pointer ${
-                                  isSelectedDrop
-                                    ? 'bg-rose-50 border-rose-400 text-rose-950 font-black shadow-xs ring-2 ring-rose-300'
-                                    : 'bg-white hover:bg-emerald-50 border-slate-200 hover:border-emerald-300 text-slate-800 shadow-2xs'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between w-full mb-0.5">
-                                  <span className={`w-1.5 h-1.5 rounded-full ${isSelectedDrop ? 'bg-rose-600' : 'bg-slate-400'}`}></span>
-                                  {isSelectedDrop ? (
-                                    <span className="text-[8px] uppercase bg-rose-600 text-white px-1.5 py-0.2 rounded font-black">Drop ✓</span>
-                                  ) : (
-                                    <span className="text-[9px] text-emerald-700 font-black">₹{stopEstFare}</span>
-                                  )}
+                              
+                              {/* Passenger Counter for multi-passenger vehicles (Auto) */}
+                              {selectedVehicleId !== 'BIKE' && selectedVehicleId !== 'TRUCK' ? (
+                                <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-xl border border-slate-200 shadow-2xs flex-shrink-0">
+                                  <span className="text-[10px] font-bold text-slate-500">Seats:</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      sounds.playPop();
+                                      setPassengersByVehicle(prev => ({
+                                        ...prev,
+                                        [selectedVehicleId]: Math.max(1, (prev[selectedVehicleId] || 1) - 1)
+                                      }));
+                                    }}
+                                    disabled={(passengersByVehicle[selectedVehicleId] || 1) <= 1}
+                                    className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center font-black text-slate-700 text-xs transition"
+                                    title="Decrease passenger count"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  <span className="font-black text-xs text-slate-900 w-4 text-center">
+                                    {passengersByVehicle[selectedVehicleId] || 1}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      sounds.playPop();
+                                      const maxSeats = currentSeatSpec.max;
+                                      setPassengersByVehicle(prev => ({
+                                        ...prev,
+                                        [selectedVehicleId]: Math.min(maxSeats, (prev[selectedVehicleId] || 1) + 1)
+                                      }));
+                                    }}
+                                    disabled={(passengersByVehicle[selectedVehicleId] || 1) >= currentSeatSpec.max}
+                                    className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center font-black text-slate-700 text-xs transition"
+                                    title="Increase passenger count"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
                                 </div>
-                                <span className="font-bold text-xs truncate w-full" title={stop.name}>{stop.name.split(' (')[0]}</span>
-                                <span className="text-[9px] text-slate-400 truncate w-full">{stop.km} km · {stop.eta}</span>
-                              </button>
-                            );
-                          })}
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-brand-blue text-[10px] font-black flex-shrink-0">
+                                  {selectedVehicleId === 'BIKE' ? '1 Rider (Solo)' : '2 Riders Max'}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Ride Feature Badges */}
+                            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+                              {selectedVehicleId === 'BIKE' && (
+                                <>
+                                  <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[10px] font-bold flex items-center gap-1 flex-shrink-0 shadow-2xs">
+                                    ⛑️ Helmet Provided
+                                  </span>
+                                  <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[10px] font-bold flex items-center gap-1 flex-shrink-0 shadow-2xs">
+                                    ⚡ Zero Traffic Delay
+                                  </span>
+                                  <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[10px] font-bold flex items-center gap-1 flex-shrink-0 shadow-2xs">
+                                    💰 Most Economical
+                                  </span>
+                                </>
+                              )}
+                              {selectedVehicleId === 'AUTO' && (
+                                <>
+                                  <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[10px] font-bold flex items-center gap-1 flex-shrink-0 shadow-2xs">
+                                    🛺 3-Seater Auto
+                                  </span>
+                                  <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[10px] font-bold flex items-center gap-1 flex-shrink-0 shadow-2xs">
+                                    ⏱️ Quick Nearby Pickup
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
-                  )}
 
                   </div>
                 )}
