@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Zaldi</string>
+    <string name="title_activity_main">Zaldi</string>
+    <string name="package_name">com.zaldi.mobility</string>
+    <string name="custom_url_scheme">com.zaldi.mobility</string>
+</resources>
