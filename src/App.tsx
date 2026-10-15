@@ -129,10 +129,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 flex flex-col selection:bg-brand-blue selection:text-white">
+    <div className="w-full h-full min-h-[100dvh] bg-white text-slate-900 flex flex-col selection:bg-brand-blue selection:text-white overflow-x-hidden">
       
-      {/* Top Universal App Navigation Header */}
-      <header className="sticky top-0 z-[120] bg-white/95 backdrop-blur-xl border-b border-slate-200 px-4 sm:px-8 py-3.5 shadow-xs">
+      {/* Top Universal App Navigation Header (Desktop / Large Screens Only) */}
+      <header className="hidden lg:block sticky top-0 z-[120] bg-white/95 backdrop-blur-xl border-b border-slate-200 px-4 sm:px-8 py-3.5 shadow-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           
           {/* Logo Branding - Direct Zaldi Identity */}
@@ -152,7 +152,7 @@ export default function App() {
           </div>
 
           {/* Primary Platform Switcher Tabs */}
-          <nav className="hidden lg:flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
+          <nav className="hidden lg:flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold overflow-x-auto no-scrollbar flex-nowrap">
             <button
               onClick={() => {
                 sounds.playPop();
@@ -252,19 +252,16 @@ export default function App() {
         </div>
       </header>
 
-      {/* Mobile Responsive Navigation Sub-Bar */}
-      <div className="lg:hidden bg-white border-b border-slate-200 px-3 py-2 flex items-center justify-center gap-1.5 overflow-x-auto no-scrollbar">
+      {/* Mobile Responsive Navigation Sub-Bar (Shown only in Partner / Telematics / 3D scenes when not on Customer App) */}
+      {activeApp !== 'CUSTOMER_APP' && (
+        <div className="lg:hidden bg-white border-b border-slate-200 px-3 py-2 flex items-center justify-start gap-1.5 overflow-x-auto no-scrollbar">
         <button
           onClick={() => {
             sounds.playPop();
             setActiveApp('CUSTOMER_APP');
             setCustomerSubTab('BOOKING');
           }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 ${
-            activeApp === 'CUSTOMER_APP' && customerSubTab === 'BOOKING'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
+          className="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 text-slate-600 hover:text-slate-900"
         >
           <Car className="w-3.5 h-3.5" />
           <span>Ride Booking</span>
@@ -276,11 +273,7 @@ export default function App() {
             setActiveApp('CUSTOMER_APP');
             setCustomerSubTab('CARPOOL');
           }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 ${
-            activeApp === 'CUSTOMER_APP' && customerSubTab === 'CARPOOL'
-              ? 'bg-[#00875A] text-white font-black shadow-md shadow-emerald-700/30' 
-              : 'text-slate-700 hover:text-slate-900'
-          }`}
+          className="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 flex-shrink-0 text-slate-700 hover:text-slate-900"
         >
           <Users className="w-3.5 h-3.5 text-emerald-400" />
           <span>Carpool Hub</span>
@@ -316,6 +309,7 @@ export default function App() {
           <span>3D Depots</span>
         </button>
       </div>
+      )}
 
       {/* Authenticated Mode Banner (Only shown when captain/admin is logged in) */}
       {(activeApp === 'DRIVER_APP' || activeApp === 'ADMIN_APP') && (
@@ -379,7 +373,11 @@ export default function App() {
       )}
 
       {/* Main App Container */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 flex flex-col justify-center bg-white">
+      <main className={`flex-1 w-full flex flex-col justify-start bg-white overflow-hidden ${
+        activeApp === 'CUSTOMER_APP' 
+          ? 'h-full p-0 m-0' 
+          : 'max-w-7xl mx-auto px-3 sm:px-6 py-4'
+      }`}>
         {activeApp === 'CUSTOMER_APP' && (
           <CustomerApp
             activeDriver={activeDriver}
@@ -441,21 +439,23 @@ export default function App() {
         }}
       />
 
-      {/* Footer Info */}
-      <footer className="border-t border-slate-200 bg-white py-4 px-6 text-center text-xs text-slate-600 flex flex-wrap items-center justify-between max-w-7xl mx-auto w-full">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-700">Zaldi Logistics & Mobility Platform</span>
-          <span>•</span>
-          <span>Hyderabad & Warangal City Network</span>
-        </div>
-        <div className="flex items-center gap-4 text-[11px] text-slate-500">
-          <span>Fast Pickup</span>
-          <span>•</span>
-          <span>Verified Captains</span>
-          <span>•</span>
-          <span>24x7 Safety Shield</span>
-        </div>
-      </footer>
+      {/* Footer Info (Desktop Only for Partner/Ops modes, never squeezing mobile Customer App) */}
+      {activeApp !== 'CUSTOMER_APP' && (
+        <footer className="hidden lg:flex border-t border-slate-200 bg-white py-4 px-6 text-center text-xs text-slate-600 flex-wrap items-center justify-between max-w-7xl mx-auto w-full">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-700">Zaldi Logistics & Mobility Platform</span>
+            <span>•</span>
+            <span>Hyderabad & Warangal City Network</span>
+          </div>
+          <div className="flex items-center gap-4 text-[11px] text-slate-500">
+            <span>Fast Pickup</span>
+            <span>•</span>
+            <span>Verified Captains</span>
+            <span>•</span>
+            <span>24x7 Safety Shield</span>
+          </div>
+        </footer>
+      )}
 
     </div>
   );

@@ -5,11 +5,14 @@ import {
   Settings, HelpCircle, Shield, LogOut, Tag, ArrowRight,
   Share2, Users, Sparkles, Navigation, Calendar, Box,
   Package, User, Briefcase, Laptop, AlertTriangle, Scale,
-  Info, Plus, Minus, AlertCircle, ChevronDown, ChevronUp, Receipt, CheckCircle2
+  Info, Plus, Minus, AlertCircle, ChevronDown, ChevronUp, Receipt, CheckCircle2,
+  KeyRound, Fingerprint, Lock
 } from 'lucide-react';
 import { 
   CustomerTab, BookingStatus, Driver, RideOrder, VehicleTier, ServiceMode, RoadRouteInfo 
 } from '../types';
+import { TransportDetailsDropdown, TransportDetails } from './TransportDetailsDropdown';
+import { ModifyAuthModal, UserAuthData } from './ModifyAuthModal';
 import { 
   VEHICLE_OPTIONS, MOCK_LOCATIONS, MOCK_CARPOOLS, 
   OUTSTATION_PACKAGES, PAST_RIDES_MOCK, INITIAL_DRIVERS 
@@ -154,6 +157,108 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     PREMIUM: 'PERSON',
     TRUCK: 'PARCEL'
   });
+
+  // Modern User Authentication & Profile State
+  const [currentUser, setCurrentUser] = useState<UserAuthData>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('zaldi_user_auth') : null;
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      name: 'Akhil Nalla',
+      phone: '+91 98480-12345',
+      email: 'akhil.nalla@zaldi.in',
+      emergencyContact: '+91 98480-99999',
+      avatarSeed: 'AN',
+      tier: 'Gold',
+      securityPin: '1234',
+      biometricsEnabled: true,
+      accountType: 'PERSONAL',
+      isPhoneVerified: true
+    };
+  });
+  const [showModifyAuthModal, setShowModifyAuthModal] = useState(false);
+
+  const handleUpdateCurrentUser = (updates: Partial<UserAuthData>) => {
+    setCurrentUser(prev => {
+      const next = { ...prev, ...updates };
+      try {
+        localStorage.setItem('zaldi_user_auth', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  // Modern Transport & Parcel Details per vehicle
+  const [transportDetailsByVehicle, setTransportDetailsByVehicle] = useState<Record<string, TransportDetails>>({
+    BIKE: {
+      parcelType: 'Documents & Envelopes',
+      weightKg: 5,
+      receiverName: 'Rahul Sharma',
+      receiverPhone: '+91 98480-22334',
+      deliveryNote: 'Call on arrival',
+      isFragile: false,
+      transitInsurance: true
+    },
+    AUTO: {
+      parcelType: 'Cartons & Medium Boxes',
+      weightKg: 25,
+      receiverName: 'Vikram Reddy',
+      receiverPhone: '+91 98112-44332',
+      deliveryNote: 'Leave at security gate',
+      isFragile: false,
+      transitInsurance: true
+    },
+    CAB: {
+      parcelType: 'Luggage & Travel Bags',
+      weightKg: 35,
+      receiverName: 'Sunita Rao',
+      receiverPhone: '+91 99887-11223',
+      deliveryNote: 'Handover directly with OTP',
+      isFragile: true,
+      transitInsurance: true
+    },
+    PREMIUM: {
+      parcelType: 'Heavy Luggage & Family Travel',
+      weightKg: 70,
+      receiverName: 'Kavya Patel',
+      receiverPhone: '+91 98765-43210',
+      deliveryNote: 'Handle with care - luggage',
+      isFragile: true,
+      transitInsurance: true
+    },
+    TRUCK: {
+      parcelType: 'Commercial Cargo & Freight',
+      weightKg: 200,
+      receiverName: 'Ganesh Logistics Ltd',
+      receiverPhone: '+91 94400-55667',
+      deliveryNote: 'Warehouse dock loading bay 4',
+      isFragile: false,
+      transitInsurance: true
+    }
+  });
+
+  const handleUpdateTransportDetails = (vehicleId: string, updates: Partial<TransportDetails>) => {
+    setTransportDetailsByVehicle(prev => {
+      const existing = prev[vehicleId] || {
+        parcelType: 'Documents & Envelopes',
+        weightKg: 5,
+        receiverName: '',
+        receiverPhone: '',
+        deliveryNote: '',
+        isFragile: false,
+        transitInsurance: true
+      };
+      return { ...prev, [vehicleId]: { ...existing, ...updates } };
+    });
+
+    if (updates.parcelType !== undefined) {
+      setParcelTypes(prev => ({ ...prev, [vehicleId]: updates.parcelType! }));
+    }
+    if (updates.weightKg !== undefined) {
+      setParcelWeights(prev => ({ ...prev, [vehicleId]: updates.weightKg! }));
+    }
+  };
 
   // Parcel details per vehicle
   const [parcelTypes, setParcelTypes] = useState<Record<string, string>>({
@@ -513,11 +618,21 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     if (!pickup || !drop) return;
     sounds.playAlert();
 
+    const transportInfo = transportDetailsByVehicle[selectedVehicleId] || {
+      parcelType: currentParcelType,
+      weightKg: currentParcelWeight,
+      receiverName: '',
+      receiverPhone: '',
+      deliveryNote: '',
+      isFragile: false,
+      transitInsurance: true
+    };
+
     const rideId = "TRP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
     const newRide: RideOrder = {
       id: rideId,
-      customerName: "Akhil Nalla",
-      customerPhone: "+91 98480-12345",
+      customerName: currentUser.name || "Akhil Nalla",
+      customerPhone: currentUser.phone || "+91 98480-12345",
       pickup,
       drop,
       distanceKm: effectiveRoadRouteInfo?.totalDistanceKm || (distanceKm > 0 ? distanceKm : 5.8),
@@ -533,8 +648,12 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       progressPercent: 0,
       serviceMode: currentMode,
-      parcelType: currentMode === 'PARCEL' ? currentParcelType : undefined,
-      parcelWeightKg: currentMode === 'PARCEL' ? currentParcelWeight : undefined,
+      parcelType: currentMode === 'PARCEL' ? (transportInfo.parcelType || currentParcelType) : undefined,
+      parcelWeightKg: currentMode === 'PARCEL' ? (transportInfo.weightKg || currentParcelWeight) : undefined,
+      receiverName: currentMode === 'PARCEL' ? transportInfo.receiverName : undefined,
+      receiverPhone: currentMode === 'PARCEL' ? transportInfo.receiverPhone : undefined,
+      deliveryNotes: currentMode === 'PARCEL' ? transportInfo.deliveryNote : undefined,
+      isFragile: currentMode === 'PARCEL' ? transportInfo.isFragile : undefined,
       luggageWeightKg: undefined,
       extraLuggageFee: 0,
       messages: [
@@ -559,10 +678,9 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const isHomeTab = customerTab === 'BOOKING';
   const getSheetHeight = () => {
     if (customerTab === 'CARPOOL') {
-      if (isCarpoolMapFocused) return '170px';
-      return 'auto';
+      return '0px';
     }
-    if (!isHomeTab) return 'auto';
+    if (customerTab === 'OUTSTATION' || customerTab === 'HISTORY' || customerTab === 'PROFILE') return '100%';
     if (activeOrder) {
       if (['FINDING_DRIVER', 'SEARCHING'].includes(activeOrder.status)) return '370px';
       if (['DRIVER_ASSIGNED', 'DRIVER_COMING'].includes(activeOrder.status)) return '440px';
@@ -577,14 +695,14 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   };
 
   return (
-    <div className="flex justify-center items-center w-full py-2 sm:py-6 bg-white">
+    <div className="w-full h-[100dvh] min-h-[100dvh] max-h-[100dvh] bg-white text-slate-900 flex flex-col font-sans overflow-hidden relative select-none">
       
-      {/* Phone Mockup Frame */}
-      <div className="relative w-full max-w-[420px] h-[870px] bg-white text-slate-900 shadow-2xl rounded-[3rem] border-[10px] border-slate-100 flex flex-col font-sans overflow-hidden ring-1 ring-slate-200">
+      {/* Full-bleed Android Mobile Viewport (100% width and 100dvh) */}
+      <div className="relative w-full h-full flex-1 flex flex-col font-sans overflow-hidden bg-white">
         
-        {/* Full-bleed Carpool Experience (Matching 5-screen mockup exactly) */}
+        {/* Full-bleed Carpool Experience (Positioned seamlessly above bottom nav) */}
         {customerTab === 'CARPOOL' && (
-          <div className="absolute inset-0 z-40 bg-white flex flex-col overflow-hidden">
+          <div className="absolute inset-0 bottom-[calc(62px+env(safe-area-inset-bottom,0px))] z-30 bg-white flex flex-col overflow-hidden">
             <CarpoolSection
               currentAddress={pickup || fixedPinAddress || 'Hanamkonda, Warangal'}
               walletBalance={walletBalance}
@@ -693,21 +811,21 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             </div>
           )}
 
-          {/* Top Brand Header Bar over Map (Unobstructed, nothing hidden behind) */}
-          <div className="absolute top-4 left-0 right-0 px-5 flex justify-between items-center z-40 pointer-events-none">
-            <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-2xl shadow-md border border-slate-200 pointer-events-auto">
+          {/* Top Brand Header Bar over Map (Safe-area aware for Android notch/status bar) */}
+          <div className="absolute top-[max(env(safe-area-inset-top,0px),0.5rem)] left-0 right-0 px-3.5 sm:px-5 flex justify-between items-center z-30 pointer-events-none">
+            <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-3 sm:px-3.5 py-1.5 rounded-2xl shadow-md border border-slate-200 pointer-events-auto">
               <div className="w-6 h-6 rounded-lg bg-brand-blue flex items-center justify-center font-black text-white text-xs shadow-md">
                 Z
               </div>
-              <span className="text-sm font-black text-slate-900 tracking-tight">
-                Zaldi <span className="text-emerald-600 text-xs font-semibold">Fast</span>
+              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
+                Zaldi <span className="text-emerald-600 text-[10px] sm:text-xs font-semibold">Fast</span>
               </span>
             </div>
 
             <div className="flex items-center gap-2 pointer-events-auto">
               <button 
                 onClick={() => setIsWalletOpen(true)}
-                className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-md border border-slate-200 text-xs font-bold text-slate-800 hover:border-blue-500 transition"
+                className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-2.5 sm:px-3 py-1.5 rounded-2xl shadow-md border border-slate-200 text-xs font-bold text-slate-800 hover:border-blue-500 transition active:scale-95"
               >
                 <Wallet className="w-3.5 h-3.5 text-brand-blue" />
                 <span>₹{walletBalance}</span>
@@ -716,7 +834,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               <button 
                 onClick={() => setShowSafety(true)}
                 title="Safety Shield"
-                className="p-2 bg-white/95 backdrop-blur-md rounded-2xl shadow-md border border-slate-200 text-slate-700 hover:text-emerald-600 transition"
+                className="p-2 bg-white/95 backdrop-blur-md rounded-2xl shadow-md border border-slate-200 text-slate-700 hover:text-emerald-600 transition active:scale-95"
               >
                 <ShieldCheck className="w-4 h-4 text-emerald-500" />
               </button>
@@ -727,13 +845,22 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
         {/* Bottom Sheet Drawer */}
         <div 
-          className={`absolute w-full bg-white rounded-t-3xl shadow-[0_-15px_40px_rgba(0,0,0,0.1)] border-t border-slate-100 transition-all duration-300 ease-in-out z-30 flex flex-col max-h-[82%]`}
-          style={{ height: getSheetHeight(), bottom: '70px' }}
+          className={`absolute left-0 right-0 w-full bg-white rounded-t-3xl shadow-[0_-15px_40px_rgba(0,0,0,0.1)] border-t border-slate-100 transition-all duration-300 ease-in-out z-20 flex flex-col ${
+            customerTab === 'CARPOOL'
+              ? 'hidden pointer-events-none'
+              : (customerTab === 'OUTSTATION' || customerTab === 'HISTORY' || customerTab === 'PROFILE')
+              ? 'h-[calc(100%-62px-env(safe-area-inset-bottom,0px))] max-h-full'
+              : 'max-h-[calc(100%-70px-env(safe-area-inset-top,0px))]'
+          }`}
+          style={{ 
+            height: customerTab === 'CARPOOL' ? '0px' : getSheetHeight(), 
+            bottom: 'calc(62px + env(safe-area-inset-bottom, 0px))' 
+          }}
         >
           {/* Pull Handle */}
           <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-2.5 mb-1.5 flex-shrink-0 cursor-pointer"></div>
 
-          <div ref={drawerScrollRef} className={`flex-1 min-h-0 overflow-y-auto px-5 no-scrollbar relative text-slate-900 ${(currentMode === 'PERSON' || customerTab === 'CARPOOL') ? 'pb-2' : 'pb-6'}`}>
+          <div ref={drawerScrollRef} className={`flex-1 min-h-0 overflow-y-auto px-3.5 sm:px-5 no-scrollbar relative text-slate-900 ${(currentMode === 'PERSON' || customerTab === 'CARPOOL') ? 'pb-2' : 'pb-6'}`}>
             
             {/* =========================================
                 1. BOOKING TAB
@@ -911,7 +1038,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1.5 px-0.5">
+                      <div className="flex gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-2.5 px-1 -mx-0.5 touch-pan-x scroll-smooth overscroll-x-contain">
                         {VEHICLE_OPTIONS.map((v) => {
                           const isSelected = selectedVehicleId === v.id;
 
@@ -930,7 +1057,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                                 setSelectedVehicleId(v.id);
                                 sounds.playPop();
                               }}
-                              className={`group flex-shrink-0 w-[112px] p-2.5 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-300 cursor-pointer relative overflow-hidden select-none bg-white ${
+                              className={`group flex-shrink-0 w-[106px] sm:w-[114px] p-2.5 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-200 cursor-pointer relative overflow-visible select-none bg-white ${
                                 isSelected 
                                   ? 'border-brand-blue shadow-lg scale-[1.02] ring-2 ring-blue-500/20' 
                                   : 'border-slate-200 hover:border-slate-300 hover:scale-[1.01]'
@@ -942,7 +1069,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                             >
                               {/* 5D Holographic Badge */}
                               {v.badge && (
-                                <span className="absolute -top-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-[8px] font-black text-white uppercase tracking-wider shadow-sm">
+                                <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-[8px] font-black text-white uppercase tracking-wider shadow-xs whitespace-nowrap z-10">
                                   {v.badge}
                                 </span>
                               )}
@@ -1051,240 +1178,25 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                           )}
                         </div>
 
-                      {/* Transport (Parcel) Service Options for all vehicles */}
+                      {/* Transport (Parcel) Modern Service Dropdown & Details */}
                       {currentMode === 'PARCEL' && (
-                        <div className="space-y-3 pt-1 border-t border-slate-200/80 dark:border-slate-700/60">
-                          {/* Type of Parcel / Cargo Dropdown Selector */}
-                          <div className="space-y-2 bg-white dark:bg-slate-900/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xs relative">
-                            <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                              <span className="flex items-center gap-1">
-                                <Package className="w-3.5 h-3.5 text-amber-500" />
-                                <span>Type of Parcel / Cargo:</span>
-                              </span>
-                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-white px-2 py-0.5 rounded-full border border-amber-300 shadow-xs">
-                                {currentParcelSpec.types.length} Types
-                              </span>
-                            </div>
-
-                            {/* Dropdown Container */}
-                            <div className="relative">
-                              {/* Backdrop to close dropdown on click outside */}
-                              {isParcelDropdownOpen && (
-                                <div 
-                                  className="fixed inset-0 z-30" 
-                                  onClick={() => setIsParcelDropdownOpen(false)} 
-                                />
-                              )}
-
-                              {/* Dropdown Trigger Button */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  sounds.playTap();
-                                  setIsParcelDropdownOpen(!isParcelDropdownOpen);
-                                }}
-                                className={`w-full p-2.5 sm:p-3 rounded-2xl border-2 transition flex items-center justify-between gap-2 shadow-xs text-left relative z-30 ${
-                                  isParcelDropdownOpen
-                                    ? 'bg-white dark:bg-slate-900 border-amber-500 ring-2 ring-amber-500/20'
-                                    : 'bg-white hover:bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-amber-400'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="w-8 h-8 rounded-xl bg-white border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center text-base flex-shrink-0 shadow-xs">
-                                    {currentParcelItem.icon}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                      <span>Parcel Type</span>
-                                      <span className="w-1 h-1 rounded-full bg-amber-400"></span>
-                                      <span className="text-amber-600 dark:text-amber-400">{selectedVehicle.name}</span>
-                                    </div>
-                                    <div className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
-                                      {currentParcelType}
-                                    </div>
-                                    {currentParcelItem.desc && (
-                                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
-                                        {currentParcelItem.desc}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  <span className="px-2 py-0.5 rounded-md bg-white border border-amber-300 text-amber-700 dark:text-amber-300 font-extrabold text-[10px] hidden xs:inline-block shadow-xs">
-                                    {isParcelDropdownOpen ? 'Close' : 'Select'}
-                                  </span>
-                                  <div className="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 shadow-xs">
-                                    {isParcelDropdownOpen ? (
-                                      <ChevronUp className="w-4 h-4 text-amber-500" />
-                                    ) : (
-                                      <ChevronDown className="w-4 h-4 text-slate-500" />
-                                    )}
-                                  </div>
-                                </div>
-                              </button>
-
-                              {/* Custom Dropdown Menu with Details and Options */}
-                              {isParcelDropdownOpen && (
-                                <div className="absolute top-[102%] left-0 right-0 bg-white dark:bg-slate-900 border-2 border-amber-500/50 rounded-2xl shadow-2xl p-1.5 z-50 max-h-64 overflow-y-auto space-y-1 animate-in fade-in zoom-in-98 divide-y divide-slate-100 dark:divide-slate-800 backdrop-blur-md">
-                                  <div className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                                    <span>Select Parcel Type</span>
-                                    <span className="text-amber-600 dark:text-amber-400 font-bold">Max {currentParcelSpec.maxWeight} kg</span>
-                                  </div>
-
-                                  <div className="pt-1 space-y-1">
-                                    {currentParcelSpec.types.map((pt) => {
-                                      const isSelected = currentParcelType === pt.label;
-                                      return (
-                                        <div
-                                          key={pt.label}
-                                          onClick={() => {
-                                            sounds.playPop();
-                                            setParcelTypes(prev => ({ ...prev, [selectedVehicleId]: pt.label }));
-                                            setIsParcelDropdownOpen(false);
-                                          }}
-                                          className={`p-2 rounded-xl flex items-center justify-between gap-2.5 cursor-pointer transition ${
-                                            isSelected
-                                              ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-black border border-amber-300/80 dark:border-amber-700/60 shadow-xs'
-                                              : 'hover:bg-slate-50 dark:hover:bg-slate-800/70 text-slate-800 dark:text-slate-200 font-semibold'
-                                          }`}
-                                        >
-                                          <div className="flex items-center gap-2.5 min-w-0">
-                                            <span className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-sm flex-shrink-0">
-                                              {pt.icon}
-                                            </span>
-                                            <div className="min-w-0">
-                                              <span className="text-xs truncate block">{pt.label}</span>
-                                              {pt.desc && (
-                                                <span className="text-[10px] text-slate-400 font-normal truncate block">
-                                                  {pt.desc}
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                          {isSelected ? (
-                                            <Check className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                                          ) : (
-                                            <span className="text-[10px] text-slate-400 font-medium">Select</span>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {/* Custom Parcel Input */}
-                                  <div className="pt-2 px-1">
-                                    <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
-                                      <input
-                                        type="text"
-                                        value={customParcelInput}
-                                        onChange={(e) => setCustomParcelInput(e.target.value)}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter' && customParcelInput.trim()) {
-                                            sounds.playSuccess();
-                                            setParcelTypes(prev => ({ ...prev, [selectedVehicleId]: customParcelInput.trim() }));
-                                            setCustomParcelInput('');
-                                            setIsParcelDropdownOpen(false);
-                                          }
-                                        }}
-                                        placeholder="Other / Custom parcel type..."
-                                        className="w-full bg-transparent px-2 text-xs text-slate-800 dark:text-white outline-none font-medium placeholder:text-slate-400"
-                                      />
-                                      <button
-                                        type="button"
-                                        disabled={!customParcelInput.trim()}
-                                        onClick={() => {
-                                          if (!customParcelInput.trim()) return;
-                                          sounds.playSuccess();
-                                          setParcelTypes(prev => ({ ...prev, [selectedVehicleId]: customParcelInput.trim() }));
-                                          setCustomParcelInput('');
-                                          setIsParcelDropdownOpen(false);
-                                        }}
-                                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-black text-[10px] transition flex-shrink-0"
-                                      >
-                                        Set
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Weight Selector & Limit Validation (Deleted for Bike) */}
-                          {selectedVehicleId !== 'BIKE' && (
-                            <div className="space-y-2 bg-white dark:bg-slate-900/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xs">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-white">
-                                  <Scale className="w-3.5 h-3.5 text-amber-500" />
-                                  <span>Weight:</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-base font-black text-slate-900 dark:text-white">
-                                    {currentParcelWeight} kg
-                                  </span>
-                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                                    currentParcelWeight > currentParcelSpec.maxWeight
-                                      ? 'bg-white text-rose-600 border border-rose-400 shadow-xs animate-pulse'
-                                      : 'bg-white text-emerald-600 border border-emerald-400 shadow-xs'
-                                  }`}>
-                                    Limit: Max {currentParcelSpec.maxWeight} kg
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Stepper (+ increase only one, - decrease only one) */}
-                              <div className="flex items-center gap-2 pt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    sounds.playPop();
-                                    setParcelWeights(prev => ({
-                                      ...prev,
-                                      [selectedVehicleId]: Math.max(1, (prev[selectedVehicleId] || 1) - 1)
-                                    }));
-                                  }}
-                                  disabled={currentParcelWeight <= 1}
-                                  className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-slate-700 dark:text-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition shadow-xs"
-                                  title="Decrease only one kg (-1)"
-                                >
-                                  <Minus className="w-3.5 h-3.5" />
-                                </button>
-
-                                <input 
-                                  type="range"
-                                  min={1}
-                                  max={currentParcelSpec.maxWeight}
-                                  step={1}
-                                  value={currentParcelWeight}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value);
-                                    setParcelWeights(prev => ({
-                                      ...prev,
-                                      [selectedVehicleId]: Math.min(currentParcelSpec.maxWeight, Math.max(1, val))
-                                    }));
-                                  }}
-                                  className="flex-1 accent-amber-500 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
-                                />
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    sounds.playPop();
-                                    setParcelWeights(prev => ({
-                                      ...prev,
-                                      [selectedVehicleId]: Math.min(currentParcelSpec.maxWeight, (prev[selectedVehicleId] || 1) + 1)
-                                    }));
-                                  }}
-                                  disabled={currentParcelWeight >= currentParcelSpec.maxWeight}
-                                  className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-slate-700 dark:text-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition shadow-xs"
-                                  title="Increase only one kg (+1)"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                        <div className="pt-1">
+                          <TransportDetailsDropdown
+                            vehicleId={selectedVehicleId}
+                            vehicleName={selectedVehicle.name}
+                            maxWeight={currentParcelSpec.maxWeight}
+                            currentDetails={transportDetailsByVehicle[selectedVehicleId] || {
+                              parcelType: currentParcelType,
+                              weightKg: currentParcelWeight,
+                              receiverName: '',
+                              receiverPhone: '',
+                              deliveryNote: '',
+                              isFragile: false,
+                              transitInsurance: true
+                            }}
+                            onChange={(updates) => handleUpdateTransportDetails(selectedVehicleId, updates)}
+                            parcelSpec={currentParcelSpec}
+                          />
                         </div>
                       )}
 
@@ -1935,37 +1847,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             )}
 
             {/* =========================================
-                2. CARPOOL TAB
+                2. CARPOOL TAB (Rendered full-bleed above map)
                ========================================= */}
-            {customerTab === 'CARPOOL' && (
-              <CarpoolSection
-                currentAddress={pickup || fixedPinAddress || 'Hanamkonda Bus Terminal'}
-                walletBalance={walletBalance}
-                passengerDestination={drop || 'Hyderabad'}
-                onDeductFare={(amt) => setWalletBalance(prev => Math.max(0, prev - amt))}
-                onDriverChange={(driver, pos) => {
-                  setActiveCarpoolDriver(driver);
-                  setActiveCarpoolDriverPos(pos);
-                }}
-                onViewRouteOnMap={(driver) => {
-                  setActiveCarpoolDriver(driver);
-                  setIsCarpoolMapFocused(true);
-                  sounds.playPop();
-                }}
-                isMapFocused={isCarpoolMapFocused}
-                onToggleMapFocus={() => setIsCarpoolMapFocused(prev => !prev)}
-                onUpdatePickupLocation={(newAddr) => {
-                  setPickup(newAddr);
-                  setFixedPinAddress(newAddr);
-                }}
-                onSelectDropoffLocation={(newDrop) => {
-                  setDrop(newDrop);
-                }}
-                onBookCarpoolSuccess={(poolId) => {
-                  setJoinedPoolId(poolId);
-                }}
-              />
-            )}
 
             {/* =========================================
                 3. OUTSTATION TAB
@@ -2094,23 +1977,119 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             )}
 
             {/* =========================================
-                5. PROFILE TAB
+                5. PROFILE TAB (MODERN AUTH & IDENTITY)
                ========================================= */}
             {customerTab === 'PROFILE' && (
-              <div className="space-y-4 pt-1 pb-6">
+              <div className="space-y-4 pt-1 pb-6 animate-in fade-in">
                 
-                {/* Profile Header Card */}
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center gap-3.5 shadow-sm">
-                  <div className="w-14 h-14 rounded-2xl bg-brand-blue text-white font-black text-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                    AN
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="font-black text-base text-slate-900 dark:text-white">Akhil Nalla</h4>
-                      <span className="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-500 font-extrabold text-[9px]">Gold</span>
+                {/* Modern Profile & Auth Master Card */}
+                <div className="p-4 bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 text-white border border-slate-800 rounded-3xl shadow-xl relative overflow-hidden space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-blue to-indigo-600 text-white font-black text-xl flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
+                        {currentUser.avatarSeed}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-black text-base text-white truncate">{currentUser.name}</h4>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-extrabold text-[9px] border border-amber-400/30">
+                            {currentUser.tier} Member
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-blue-300 font-bold mt-0.5">
+                          <Phone className="w-3 h-3 text-emerald-400" />
+                          <span>{currentUser.phone}</span>
+                          {currentUser.isPhoneVerified && (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate">{currentUser.email}</p>
+                      </div>
                     </div>
-                    <p className="text-xs text-brand-blue font-bold">+91 98480-12345</p>
-                    <p className="text-[11px] text-slate-400">akhil.nalla@zaldi.in</p>
+                  </div>
+
+                  {/* Account Badge & Quick Switch Tag */}
+                  <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="text-slate-300 font-semibold text-[11px]">
+                        {currentUser.accountType === 'BUSINESS' 
+                          ? '🏢 Corporate Business Fleet' 
+                          : currentUser.accountType === 'STUDENT'
+                          ? '🎓 Student Commuter Pass'
+                          : '👤 Individual Personal Account'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                      OTP Verified Link
+                    </span>
+                  </div>
+
+                  {/* Primary "Modify Auth & Profile" Action Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playPop();
+                      setShowModifyAuthModal(true);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-brand-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-black text-xs shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-2 active:scale-98"
+                  >
+                    <KeyRound className="w-4 h-4 text-blue-200" />
+                    <span>Modify Profile & Auth Details</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-blue-200" />
+                  </button>
+                </div>
+
+                {/* Security & Authentication Credentials Card */}
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-2.5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-black text-slate-900 dark:text-white">
+                      <Shield className="w-4 h-4 text-emerald-500" />
+                      <span>Security & Credentials Status</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playTap();
+                        setShowModifyAuthModal(true);
+                      }}
+                      className="text-[11px] font-bold text-brand-blue hover:underline"
+                    >
+                      Update →
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      <div className="text-slate-400 text-[10px] font-bold">Phone Authentication</div>
+                      <div className="font-black text-slate-800 dark:text-white flex items-center gap-1 mt-0.5">
+                        <Check className="w-3 h-3 text-emerald-500 stroke-[3]" />
+                        <span>OTP Linked</span>
+                      </div>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      <div className="text-slate-400 text-[10px] font-bold">4-Digit Security PIN</div>
+                      <div className="font-black text-slate-800 dark:text-white flex items-center gap-1 mt-0.5">
+                        <Lock className="w-3 h-3 text-blue-500" />
+                        <span>•••• Configured</span>
+                      </div>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      <div className="text-slate-400 text-[10px] font-bold">Biometric Passkey</div>
+                      <div className="font-black text-slate-800 dark:text-white flex items-center gap-1 mt-0.5">
+                        <Fingerprint className="w-3 h-3 text-indigo-500" />
+                        <span>{currentUser.biometricsEnabled ? 'Face ID Active' : 'Off'}</span>
+                      </div>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      <div className="text-slate-400 text-[10px] font-bold">Emergency SOS</div>
+                      <div className="font-black text-slate-800 dark:text-white truncate mt-0.5">
+                        {currentUser.emergencyContact || '112 Police'}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2206,14 +2185,14 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             <div className="p-3 bg-white/98 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.1)] z-30 flex-shrink-0 space-y-2">
               {/* Promo Coupon Box (Always Visible & Accessible) */}
               <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Tag className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <div className="relative flex-1 min-w-0">
+                  <Tag className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 flex-shrink-0" />
                   <input 
                     type="text"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                     placeholder="Coupon (e.g. ZALDI50)"
-                    className="w-full pl-8 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 uppercase placeholder-slate-400 outline-none focus:border-brand-blue focus:ring-1 focus:ring-blue-500/20 shadow-xs"
+                    className="w-full pl-8 pr-2 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 uppercase placeholder-slate-400 outline-none focus:border-brand-blue focus:ring-1 focus:ring-blue-500/20 shadow-xs"
                   />
                 </div>
                 <button
@@ -2225,26 +2204,26 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               </div>
 
               {promoMessage && (
-                <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 px-1">
+                <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 px-1 truncate">
                   {promoMessage}
                 </div>
               )}
 
               {/* Payment Method Selector (Always Visible & Accessible) */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200 text-xs shadow-xs">
-                <span className="font-semibold text-slate-500 text-[11px]">Payment:</span>
-                <div className="flex gap-1.5">
+              <div className="flex items-center justify-between gap-1 p-1.5 sm:p-2 rounded-xl bg-white border border-slate-200 text-xs shadow-xs">
+                <span className="font-semibold text-slate-500 text-[11px] flex-shrink-0">Payment:</span>
+                <div className="flex gap-1 overflow-x-auto no-scrollbar">
                   {(['WALLET', 'UPI', 'CASH'] as const).map(pm => (
                     <button
                       key={pm}
                       onClick={() => setPaymentMethod(pm)}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] bg-white transition flex items-center gap-1 ${
+                      className={`px-2 py-1 rounded-lg text-[10px] whitespace-nowrap bg-white transition flex items-center gap-1 flex-shrink-0 ${
                         paymentMethod === pm
                           ? 'border-2 border-brand-blue text-brand-blue font-black shadow-xs ring-1 ring-blue-500/20'
                           : 'border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-800 font-semibold'
                       }`}
                     >
-                      {pm === 'WALLET' ? `Wallet (₹${walletBalance})` : pm}
+                      {pm === 'WALLET' ? `Wallet (₹${Math.round(walletBalance)})` : pm}
                     </button>
                   ))}
                 </div>
@@ -2287,7 +2266,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                   }
                 }}
                 disabled={Boolean(pickup && drop && isWeightExceeded)}
-                className={`w-full py-3.5 rounded-2xl font-black text-sm shadow-xl flex justify-center items-center gap-2 transition-all active:scale-98 ${
+                className={`w-full py-3 sm:py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm shadow-xl flex justify-center items-center gap-2 transition-all active:scale-98 ${
                   !pickup || !drop
                     ? 'bg-brand-blue hover:bg-blue-600 text-white shadow-blue-500/25 ring-2 ring-blue-500/20'
                     : isWeightExceeded
@@ -2297,8 +2276,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                     : 'bg-brand-blue text-white shadow-blue-600/30 hover:bg-blue-600'
                 }`}
               >
-                <Navigation className="w-4 h-4" />
-                <span>
+                <Navigation className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate">
                   {!pickup || !drop 
                     ? 'Enter Pickup & Drop' 
                     : isWeightExceeded 
@@ -2307,25 +2286,25 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                     ? `Confirm ${activeTierConfig.name} Delivery • ₹${finalCalculatedFare}`
                     : `Confirm ${activeTierConfig.name} Ride • ₹${finalCalculatedFare}`}
                 </span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 flex-shrink-0" />
               </button>
             </div>
           )}
         </div>
 
         {/* Bottom Navigation Bar */}
-        <div className="absolute bottom-0 w-full h-[70px] bg-white border-t border-slate-200 flex justify-between items-center px-4 z-40">
+        <div className="absolute bottom-0 left-0 right-0 w-full h-[calc(62px+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/98 backdrop-blur-md border-t border-slate-200 flex justify-between items-center px-1 sm:px-3 z-40">
           <button 
             onClick={() => {
               setCustomerTab('BOOKING');
               sounds.playPop();
             }}
-            className={`flex flex-col items-center justify-center w-full gap-1 transition ${
-              customerTab === 'BOOKING' ? 'text-brand-blue' : 'text-slate-400 hover:text-slate-600'
+            className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-0.5 gap-0.5 transition ${
+              customerTab === 'BOOKING' ? 'text-brand-blue font-black' : 'text-slate-400 hover:text-slate-600 font-semibold'
             }`}
           >
-            <Navigation className={`w-5 h-5 ${customerTab === 'BOOKING' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-            <span className="text-[10px] font-bold">Ride</span>
+            <Navigation className={`w-5 h-5 flex-shrink-0 ${customerTab === 'BOOKING' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+            <span className="text-[10px] leading-tight truncate max-w-full">Ride</span>
           </button>
 
           <button 
@@ -2333,12 +2312,12 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               setCustomerTab('CARPOOL');
               sounds.playPop();
             }}
-            className={`flex flex-col items-center justify-center w-full gap-1 transition ${
-              customerTab === 'CARPOOL' ? 'text-brand-blue' : 'text-slate-400 hover:text-slate-600'
+            className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-0.5 gap-0.5 transition ${
+              customerTab === 'CARPOOL' ? 'text-brand-blue font-black' : 'text-slate-400 hover:text-slate-600 font-semibold'
             }`}
           >
-            <Users className={`w-5 h-5 ${customerTab === 'CARPOOL' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-            <span className="text-[10px] font-bold">Carpool</span>
+            <Users className={`w-5 h-5 flex-shrink-0 ${customerTab === 'CARPOOL' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+            <span className="text-[10px] leading-tight truncate max-w-full">Carpool</span>
           </button>
 
           <button 
@@ -2346,12 +2325,12 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               setCustomerTab('OUTSTATION');
               sounds.playPop();
             }}
-            className={`flex flex-col items-center justify-center w-full gap-1 transition ${
-              customerTab === 'OUTSTATION' ? 'text-brand-blue' : 'text-slate-400 hover:text-slate-600'
+            className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-0.5 gap-0.5 transition ${
+              customerTab === 'OUTSTATION' ? 'text-brand-blue font-black' : 'text-slate-400 hover:text-slate-600 font-semibold'
             }`}
           >
-            <Calendar className={`w-5 h-5 ${customerTab === 'OUTSTATION' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-            <span className="text-[10px] font-bold">Outstation</span>
+            <Calendar className={`w-5 h-5 flex-shrink-0 ${customerTab === 'OUTSTATION' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+            <span className="text-[10px] leading-tight truncate max-w-full">Outstation</span>
           </button>
 
           <button 
@@ -2359,12 +2338,12 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               setCustomerTab('HISTORY');
               sounds.playPop();
             }}
-            className={`flex flex-col items-center justify-center w-full gap-1 transition ${
-              customerTab === 'HISTORY' ? 'text-brand-blue' : 'text-slate-400 hover:text-slate-600'
+            className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-0.5 gap-0.5 transition ${
+              customerTab === 'HISTORY' ? 'text-brand-blue font-black' : 'text-slate-400 hover:text-slate-600 font-semibold'
             }`}
           >
-            <Clock className={`w-5 h-5 ${customerTab === 'HISTORY' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-            <span className="text-[10px] font-bold">History</span>
+            <Clock className={`w-5 h-5 flex-shrink-0 ${customerTab === 'HISTORY' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+            <span className="text-[10px] leading-tight truncate max-w-full">History</span>
           </button>
 
           <button 
@@ -2372,16 +2351,16 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               setCustomerTab('PROFILE');
               sounds.playPop();
             }}
-            className={`flex flex-col items-center justify-center w-full gap-1 transition ${
-              customerTab === 'PROFILE' ? 'text-brand-blue' : 'text-slate-400 hover:text-slate-600'
+            className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 px-0.5 gap-0.5 transition ${
+              customerTab === 'PROFILE' ? 'text-brand-blue font-black' : 'text-slate-400 hover:text-slate-600 font-semibold'
             }`}
           >
-            <div className={`w-5 h-5 rounded-full border ${
-              customerTab === 'PROFILE' ? 'border-brand-blue bg-blue-100 text-brand-blue' : 'border-slate-400'
+            <div className={`w-5 h-5 rounded-full border flex-shrink-0 ${
+              customerTab === 'PROFILE' ? 'border-brand-blue bg-blue-100 text-brand-blue font-black' : 'border-slate-400'
             } flex items-center justify-center text-[10px] font-black`}>
               A
             </div>
-            <span className="text-[10px] font-bold">Account</span>
+            <span className="text-[10px] leading-tight truncate max-w-full">Account</span>
           </button>
         </div>
 
@@ -2418,6 +2397,20 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
         <SafetyModal 
           order={activeOrder} 
           onClose={() => setShowSafety(false)} 
+        />
+      )}
+
+      {showModifyAuthModal && (
+        <ModifyAuthModal
+          isOpen={showModifyAuthModal}
+          onClose={() => setShowModifyAuthModal(false)}
+          currentUser={currentUser}
+          onUpdateUser={handleUpdateCurrentUser}
+          onSwitchAppRole={(role) => {
+            if (role === 'DRIVER_APP') {
+              onSwitchToCaptain?.();
+            }
+          }}
         />
       )}
 

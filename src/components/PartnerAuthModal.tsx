@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Lock, Shield, Car, X, Check, AlertCircle, Sparkles, ArrowRight } from 'lucide-react';
+import { 
+  Lock, Shield, Car, X, Check, AlertCircle, Sparkles, ArrowRight,
+  KeyRound, ShieldCheck, Fingerprint, Eye, EyeOff
+} from 'lucide-react';
 import { AppRole } from '../types';
 import { sounds } from '../services/audio';
 
@@ -16,6 +19,7 @@ export const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({
 }) => {
   const [selectedRole, setSelectedRole] = useState<'DRIVER' | 'ADMIN'>('DRIVER');
   const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -31,7 +35,7 @@ export const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({
         onClose();
       } else {
         sounds.playAlert();
-        setErrorMsg('Invalid Captain PIN. Try 1234 or use Demo Login.');
+        setErrorMsg('Invalid Captain PIN. Try 1234 or tap quick demo below.');
       }
     } else {
       if (pin === '9999' || pin === 'admin' || pin.trim() === '') {
@@ -40,7 +44,7 @@ export const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({
         onClose();
       } else {
         sounds.playAlert();
-        setErrorMsg('Invalid Admin Key. Try 9999 or use Demo Login.');
+        setErrorMsg('Invalid Admin Key. Try 9999 or tap quick demo below.');
       }
     }
   };
@@ -51,19 +55,37 @@ export const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({
     onClose();
   };
 
+  const handleKeypadDigit = (digit: string) => {
+    if (pin.length < 6) {
+      sounds.playTap();
+      setPin(prev => prev + digit);
+    }
+  };
+
+  const handleBackspace = () => {
+    sounds.playPop();
+    setPin(prev => prev.slice(0, -1));
+  };
+
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 text-slate-100">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in select-none">
+      <div className="relative w-full max-w-md bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 text-slate-100 ring-1 ring-blue-500/20">
         
+        {/* Glowing Top Ambient Pill */}
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-500/30 flex items-center gap-1.5">
+          <ShieldCheck className="w-3 h-3" />
+          <span>Restricted Portal Access</span>
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 pt-1">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-brand-blue/20 border border-blue-500/40 flex items-center justify-center text-brand-blue">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-blue to-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
               <Lock className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-black text-base text-white">Partner & Operations Portal</h3>
-              <p className="text-xs text-slate-400">Restricted authentication for captains & fleet dispatch</p>
+              <h3 className="font-black text-base text-white">Partner Authentication</h3>
+              <p className="text-xs text-slate-400">Captains cockpit & fleet operations dispatch</p>
             </div>
           </div>
           <button 
@@ -75,7 +97,7 @@ export const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({
         </div>
 
         {/* Role Selector Tabs */}
-        <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+        <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800/90">
           <button
             type="button"
             onClick={() => {
@@ -84,9 +106,9 @@ export const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({
               setErrorMsg(null);
               sounds.playPop();
             }}
-            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-xs transition ${
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs transition-all ${
               selectedRole === 'DRIVER'
-                ? 'bg-brand-blue text-white shadow-lg shadow-blue-600/30'
+                ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md shadow-blue-600/30'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -102,9 +124,9 @@ export const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({
               setErrorMsg(null);
               sounds.playPop();
             }}
-            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-xs transition ${
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs transition-all ${
               selectedRole === 'ADMIN'
-                ? 'bg-brand-blue text-white shadow-lg shadow-blue-600/30'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/30'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -113,56 +135,108 @@ export const PartnerAuthModal: React.FC<PartnerAuthModalProps> = ({
           </button>
         </div>
 
-        {/* PIN Verification Form */}
-        <form onSubmit={handleVerify} className="space-y-4">
+        {/* Modern PIN Display Form */}
+        <form onSubmit={handleVerify} className="space-y-3.5">
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5">
-              {selectedRole === 'DRIVER' ? 'Captain Security PIN' : 'Ops Admin Passkey'}
-            </label>
-            <input
-              type="password"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder={selectedRole === 'DRIVER' ? 'Enter 4-digit PIN (e.g. 1234)' : 'Enter Admin Key (e.g. 9999)'}
-              className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-center text-sm tracking-widest text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            />
+            <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-1.5">
+              <span>{selectedRole === 'DRIVER' ? 'Captain 4-Digit Security PIN' : 'Ops Admin Master Passkey'}</span>
+              <button
+                type="button"
+                onClick={() => setShowPin(!showPin)}
+                className="text-slate-400 hover:text-white flex items-center gap-1 text-[11px]"
+              >
+                {showPin ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                <span>{showPin ? 'Hide' : 'Show'}</span>
+              </button>
+            </div>
+
+            <div className="relative">
+              <input
+                type={showPin ? 'text' : 'password'}
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder={selectedRole === 'DRIVER' ? 'e.g. 1234' : 'e.g. 9999'}
+                className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-center text-base tracking-[0.4em] text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+
             {errorMsg && (
-              <div className="flex items-center gap-1.5 text-xs text-rose-400 mt-2 font-semibold">
+              <div className="flex items-center gap-1.5 text-xs text-rose-400 mt-2 font-semibold animate-in fade-in">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>{errorMsg}</span>
               </div>
             )}
           </div>
 
+          {/* Interactive Modern Keypad for Quick Mobile Input */}
+          <div className="grid grid-cols-3 gap-1.5 pt-1">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map(btn => (
+              <button
+                key={btn}
+                type="button"
+                onClick={() => {
+                  if (btn === 'C') {
+                    sounds.playPop();
+                    setPin('');
+                  } else if (btn === '⌫') {
+                    handleBackspace();
+                  } else {
+                    handleKeypadDigit(btn);
+                  }
+                }}
+                className={`py-2 rounded-xl text-xs font-mono font-black transition active:scale-95 ${
+                  btn === 'C' 
+                    ? 'bg-rose-950/40 text-rose-300 border border-rose-800/40 hover:bg-rose-900/40' 
+                    : btn === '⌫'
+                    ? 'bg-slate-800/80 text-slate-300 border border-slate-700 hover:bg-slate-700'
+                    : 'bg-slate-950/80 border border-slate-800 text-slate-100 hover:bg-slate-800'
+                }`}
+              >
+                {btn}
+              </button>
+            ))}
+          </div>
+
           <button
             type="submit"
-            className="w-full py-3 rounded-2xl bg-brand-blue hover:bg-blue-600 text-white font-black text-sm shadow-xl shadow-blue-600/30 transition flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-2xl bg-gradient-to-r from-brand-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-black text-sm shadow-xl shadow-blue-600/30 transition flex items-center justify-center gap-2 active:scale-98"
           >
             <span>Authenticate & Launch Portal</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {/* One-Click Demo Access for Evaluation */}
-        <div className="pt-2 border-t border-slate-800 space-y-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Reviewer 1-Click Access</span>
+        {/* 1-Click Demo Badges for Instant Evaluation */}
+        <div className="pt-2 border-t border-slate-800/80 space-y-2">
+          <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Reviewer 1-Click Demo Login</span>
+            </span>
+            <span className="text-[10px] text-slate-500">Auto-Bypass</span>
           </div>
+
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => handleQuickDemo('DRIVER_APP')}
-              className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition"
+              className="p-2.5 rounded-xl bg-slate-950/90 hover:bg-slate-800/90 border border-slate-800 text-left transition group"
             >
-              <div className="text-[11px] font-black text-white">Captain Cockpit</div>
-              <div className="text-[9px] text-slate-400">PIN 1234 • Ready</div>
+              <div className="text-xs font-black text-white group-hover:text-blue-400 flex items-center gap-1">
+                <span>Captain Cockpit</span>
+                <span className="text-blue-400">→</span>
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">PIN 1234 • Ready to drive</div>
             </button>
+
             <button
               onClick={() => handleQuickDemo('ADMIN_APP')}
-              className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition"
+              className="p-2.5 rounded-xl bg-slate-950/90 hover:bg-slate-800/90 border border-slate-800 text-left transition group"
             >
-              <div className="text-[11px] font-black text-white">Ops Command</div>
-              <div className="text-[9px] text-slate-400">Key 9999 • D3 Heatmap</div>
+              <div className="text-xs font-black text-white group-hover:text-indigo-400 flex items-center gap-1">
+                <span>Ops Command</span>
+                <span className="text-indigo-400">→</span>
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Key 9999 • D3 GIS & Heatmaps</div>
             </button>
           </div>
         </div>

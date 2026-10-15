@@ -1,0 +1,42 @@
+<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Front Wheel (Faceted) -->
+  <polygon points="370,360 410,335 420,290 395,260 360,285 350,330" fill="#0f172a" />
+  <polygon points="370,360 350,330 360,285 380,310" fill="#1e293b" />
+  <polygon points="375,330 395,315 400,295 385,285 370,300" fill="#facc15" />
+
+  <!-- Rear Left Wheel -->
+  <polygon points="110,380 150,355 160,315 140,285 100,310 90,350" fill="#0f172a" />
+  <polygon points="110,380 90,350 100,310 120,335" fill="#1e293b" />
+  <polygon points="115,350 135,335 140,315 125,305 110,320" fill="#15803d" />
+
+  <!-- Lower Body Tub / Chassis (Rich Emerald Green) -->
+  <polygon points="120,330 250,345 360,315 390,265 260,280 145,290" fill="#15803d" />
+  <polygon points="120,330 145,290 130,265 105,300" fill="#166534" />
+  <polygon points="250,345 360,315 350,295 245,320" fill="#14532d" />
+
+  <!-- Front Tapered Nose / Bonnet (Canary & Emerald Facets) -->
+  <polygon points="360,315 425,270 390,230 330,265" fill="#16a34a" />
+  <polygon points="390,230 425,270 415,250 380,215" fill="#eab308" />
+  <!-- Front Headlight (Faceted Amber Glow) -->
+  <polygon points="410,260 435,245 425,235 400,250" fill="#fef08a" />
+
+  <!-- Windshield (Low-Poly Glass Facets) -->
+  <polygon points="330,265 390,230 360,170 300,195" fill="#38bdf8" fill-opacity="0.9" />
+  <polygon points="330,265 300,195 275,205 305,275" fill="#7dd3fc" fill-opacity="0.85" />
+
+  <!-- Cabin Pillars -->
+  <polygon points="150,270 160,270 160,190 150,190" fill="#1e293b" />
+  <polygon points="265,260 275,260 270,185 260,185" fill="#1e293b" />
+
+  <!-- HIGH-CONTRAST ROOF CANOPY (Bright Canary Yellow Top & Sides) -->
+  <!-- Roof Side Flank (Golden Amber) -->
+  <polygon points="145,195 295,190 355,165 340,150 280,170 135,175" fill="#eab308" />
+  <!-- Roof Top Plane (Vibrant Canary Yellow) -->
+  <polygon points="135,175 280,170 340,150 260,130 110,150" fill="#facc15" />
+  <polygon points="340,150 355,165 305,145 260,130" fill="#fde047" />
+
+  <!-- ZALDI 'Z' EMBLEM on the Yellow Roof (High Contrast Slate) -->
+  <polygon points="195,158 245,147 235,153 210,158" fill="#0f172a" />
+  <polygon points="235,153 210,158 230,165 200,171" fill="#0284c7" />
+  <polygon points="200,171 230,165 250,161 220,166" fill="#0f172a" />
+</svg>

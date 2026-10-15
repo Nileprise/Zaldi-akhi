@@ -3369,12 +3369,11 @@ export const CarpoolSection: React.FC<CarpoolInteractiveSectionProps> = ({
 
 
       {/* =========================================================================
-      {/* =========================================================================
           MODAL: EDIT STOPS (EXACT MATCH TO IMG_20261014_215259.png)
          ========================================================================= */}
       {showEditLocationsModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden flex flex-col p-4 sm:p-5 space-y-4 animate-in zoom-in-95 duration-150 max-h-[95vh] overflow-y-auto no-scrollbar">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden flex flex-col p-3.5 sm:p-5 space-y-3 sm:space-y-4 animate-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto no-scrollbar">
             
             {/* 1. Header: Back Arrow, Edit Stops Title, Reset */}
             <div className="flex items-center justify-between pb-0.5">
