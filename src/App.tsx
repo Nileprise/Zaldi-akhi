@@ -24,7 +24,7 @@ import { PartnerAuthModal } from './components/PartnerAuthModal';
 
 export default function App() {
   const [activeApp, setActiveApp] = useState<AppRole>('CUSTOMER_APP');
-  const [customerSubTab, setCustomerSubTab] = useState<CustomerTab>('CARPOOL');
+  const [customerSubTab, setCustomerSubTab] = useState<CustomerTab>('BOOKING');
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [authenticatedRole, setAuthenticatedRole] = useState<AppRole | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>(INITIAL_DRIVERS);

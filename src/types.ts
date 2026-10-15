@@ -106,6 +106,10 @@ export interface RideOrder {
   parcelWeightKg?: number;
   luggageWeightKg?: number;
   extraLuggageFee?: number;
+  receiverName?: string;
+  receiverPhone?: string;
+  deliveryNotes?: string;
+  isFragile?: boolean;
   messages?: TripMessage[];
 }
 
