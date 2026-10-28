@@ -3,18 +3,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { 
   AppRole, Driver, RideOrder, TripMessage, CustomerTab 
 } from './types';
 import { INITIAL_DRIVERS } from './services/mockData';
 import { CustomerApp } from './components/CustomerApp';
-import { CaptainApp } from './components/CaptainApp';
-import { AdminApp } from './components/AdminApp';
-import { FleetTelematicsGIS } from './components/FleetTelematicsGIS';
-import { ArchitecturalDepotViewer } from './components/ArchitecturalDepotViewer';
+const CaptainApp = lazy(() => import('./components/CaptainApp').then(({ CaptainApp }) => ({ default: CaptainApp })));
+const AdminApp = lazy(() => import('./components/AdminApp').then(({ AdminApp }) => ({ default: AdminApp })));
+const FleetTelematicsGIS = lazy(() => import('./components/FleetTelematicsGIS').then(({ FleetTelematicsGIS }) => ({ default: FleetTelematicsGIS })));
+const ArchitecturalDepotViewer = lazy(() => import('./components/ArchitecturalDepotViewer').then(({ ArchitecturalDepotViewer }) => ({ default: ArchitecturalDepotViewer })));
 import { sounds } from './services/audio';
 import { tripChatBroadcaster } from './services/tripChatService';
+import { signOutFirebase } from './services/firebase';
 import { 
   Smartphone, UserCheck, Shield, Sparkles, 
   Volume2, Car, Bell, ExternalLink, KeyRound, LogOut, ArrowLeft,
@@ -95,6 +96,14 @@ export default function App() {
     setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, ...updates } : d));
   };
 
+  const handleAddDriver = (driver: Driver) => {
+    setDrivers(prev => [driver, ...prev.filter(existing => existing.id !== driver.id)]);
+  };
+
+  const handleDeleteDriver = (driverId: string) => {
+    setDrivers(prev => prev.filter(driver => driver.id !== driverId));
+  };
+
   const handleSimulateIncomingRide = () => {
     sounds.playAlert();
     const orderId = "TRP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -129,7 +138,7 @@ export default function App() {
   };
 
   return (
-    <div className="w-full h-full min-h-[100dvh] bg-white text-slate-900 flex flex-col selection:bg-brand-blue selection:text-white overflow-x-hidden">
+    <div className="w-full h-full min-h-[100svh] bg-white text-slate-900 flex flex-col selection:bg-brand-blue selection:text-white overflow-x-hidden">
       
       {/* Top Universal App Navigation Header (Desktop / Large Screens Only) */}
       <header className="hidden lg:block sticky top-0 z-[120] bg-white/95 backdrop-blur-xl border-b border-slate-200 px-4 sm:px-8 py-3.5 shadow-xs">
@@ -336,8 +345,13 @@ export default function App() {
             <button
               onClick={() => {
                 sounds.playPop();
-                setAuthenticatedRole(null);
-                setActiveApp('CUSTOMER_APP');
+                void signOutFirebase().then(() => {
+                  setAuthenticatedRole(null);
+                  setActiveApp('CUSTOMER_APP');
+                }).catch((error: unknown) => {
+                  console.error('Firebase sign-out failed:', error);
+                  window.alert(error instanceof Error ? error.message : 'Unable to sign out.');
+                });
               }}
               className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition"
             >
@@ -425,6 +439,10 @@ export default function App() {
             orders={orders}
             onUpdateDriver={handleUpdateDriver}
             onUpdateOrder={handleUpdateOrder}
+            onAddDriver={handleAddDriver}
+            onDeleteDriver={handleDeleteDriver}
+            onAddOrder={handleNewOrder}
+            onDeleteOrder={(orderId) => setOrders(prev => prev.filter(order => order.id !== orderId))}
           />
         )}
       </main>
